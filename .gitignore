@@ -1,0 +1,7 @@
+node_modules/
+.env
+*.log
+package-lock.json
+babahoms_lt.txt
+cloudflare_url.txt
+lt_url.txt

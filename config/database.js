@@ -1,9 +1,9 @@
 const { Sequelize } = require("sequelize");
 require("dotenv").config();
 
-const isPostgres = process.env.DATABASE_URL || process.env.POSTGRES_URL || process.env.DB_DIALECT === "postgres";
+const isPostgres = process.env.POSTGRES_URL || process.env.DATABASE_URL || process.env.DB_DIALECT === "postgres";
 
-let dbUrl = process.env.DATABASE_URL || process.env.POSTGRES_URL;
+let dbUrl = process.env.POSTGRES_URL || process.env.DATABASE_URL;
 if (dbUrl && dbUrl.includes("sslmode=")) {
     dbUrl = dbUrl.split("?")[0];
 }

@@ -12,14 +12,6 @@ require("./models/associations"); // Load associations
 
 const app = express();
 
-// CORS Configuration
-const allowedOrigins = [
-    "http://localhost:3000",
-    "http://localhost:5173",
-    "https://thriving-alpaca-0d058a.netlify.app",
-    "https://babahomesbackend.vercel.app"
-];
-
 app.use(cors({
     origin: "*",
     credentials: true
@@ -45,33 +37,29 @@ app.get("/api/health", async (req, res) => {
         });
     }
 });
+
 app.get("/", (req, res) => res.json({ message: "Baba Homs API is running", status: "ok" }));
 
 const PORT = process.env.PORT || 5000;
 
-const startServer = async () => {
-    try {
-        await sequelize.authenticate();
-        console.log("Database connected successfully");
-        await sequelize.sync();
-        console.log("Database synced successfully");
-
-        if (process.env.NODE_ENV !== "production") {
+// Development only: Start server and sync DB
+if (process.env.NODE_ENV !== "production") {
+    const startServer = async () => {
+        try {
+            await sequelize.authenticate();
+            console.log("Database connected successfully");
+            await sequelize.sync();
+            console.log("Database synced successfully");
             app.listen(PORT, () => {
                 console.log(`Server running on port ${PORT}`);
             });
-        }
-    } catch (error) {
-        console.error("Unable to connect to database:", error.message);
-        // Only exit in development. In production (Vercel), let the app handle the error.
-        if (process.env.NODE_ENV !== "production") {
+        } catch (error) {
+            console.error("Unable to connect to database:", error.message);
             process.exit(1);
         }
-    }
-};
-
-// Start initialization
-startServer();
+    };
+    startServer();
+}
 
 // Export for Vercel
 module.exports = app;

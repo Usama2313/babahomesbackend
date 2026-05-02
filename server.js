@@ -12,37 +12,8 @@ require("./models/associations"); // Load associations
 
 const app = express();
 
-// CORS Configuration
-const allowedOrigins = [
-    "http://localhost:3000",
-    "http://localhost:5173",
-    "https://thriving-alpaca-0d058a.netlify.app",
-    "https://babahomesbackend.vercel.app"
-];
-
-
-
-
 app.use(cors({
-    origin: function (origin, callback) {
-        // allow requests with no origin (like mobile apps or curl requests)
-        if (!origin) return callback(null, true);
-
-        const isAllowed = allowedOrigins.indexOf(origin) !== -1 ||
-            origin.includes("localhost") ||
-            origin.includes("127.0.0.1") ||
-            origin.endsWith(".loca.lt") ||
-            origin.endsWith(".netlify.app") ||
-            origin.endsWith(".vercel.app") ||
-            origin.endsWith(".ngrok-free.app");
-
-        if (isAllowed) {
-            return callback(null, true);
-        } else {
-            console.log("CORS Blocked for Origin:", origin);
-            return callback(new Error('CORS policy error'), false);
-        }
-    },
+    origin: "*", // Temporarily allow all for debugging
     credentials: true
 }));
 
@@ -52,8 +23,31 @@ app.use(express.urlencoded({ limit: "50mb", extended: true }));
 app.use("/api/properties", propertyRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/chat", chatRoutes);
-app.get("/api/health", (req, res) => res.json({ status: "ok", time: new Date() }));
+app.get("/api/health", async (req, res) => {
+    try {
+        await sequelize.authenticate();
+        res.json({ status: "ok", database: "connected", time: new Date() });
+    } catch (err) {
+        res.json({
+            status: "error",
+            database: "disconnected",
+            message: err.message,
+            tip: "Check your Vercel Environment Variables.",
+            time: new Date()
+        });
+    }
+});
 app.get("/", (req, res) => res.json({ message: "Baba Homs API is running", status: "ok" }));
+
+// Global Error Handler
+app.use((err, req, res, next) => {
+    console.error("Global Error:", err);
+    res.status(500).json({
+        error: "Internal Server Error",
+        message: err.message,
+        tip: "Check if your Database environment variables are set correctly in Vercel."
+    });
+});
 
 const PORT = process.env.PORT || 5000;
 
@@ -107,8 +101,10 @@ const startServer = async () => {
 if (process.env.NODE_ENV !== "production") {
     startServer();
 } else {
-    // On Vercel, just sync the DB (if needed) and export
-    sequelize.sync().then(() => console.log("Database synced for production"));
+    // On Vercel, attempt sync but don't crash if it fails
+    sequelize.sync()
+        .then(() => console.log("Database synced for production"))
+        .catch(err => console.error("Production DB Sync Error:", err.message));
 }
 
 module.exports = app;

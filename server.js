@@ -32,7 +32,19 @@ app.use("/api/properties", propertyRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/chat", chatRoutes);
 
-app.get("/api/health", (req, res) => res.json({ status: "ok", time: new Date() }));
+app.get("/api/health", async (req, res) => {
+    try {
+        await sequelize.authenticate();
+        res.json({ status: "ok", database: "connected", time: new Date() });
+    } catch (err) {
+        res.status(500).json({
+            status: "error",
+            database: "disconnected",
+            message: err.message,
+            time: new Date()
+        });
+    }
+});
 app.get("/", (req, res) => res.json({ message: "Baba Homs API is running", status: "ok" }));
 
 const PORT = process.env.PORT || 5000;

@@ -3,6 +3,8 @@ require("dotenv").config();
 
 const isPostgres = process.env.DATABASE_URL || process.env.POSTGRES_URL || process.env.DB_DIALECT === "postgres";
 
+console.log(`[Config DB] Attempting connection with user: ${process.env.DB_USER || "Not Set"}`);
+
 const sequelize = (process.env.DATABASE_URL || process.env.POSTGRES_URL)
     ? new Sequelize((process.env.DATABASE_URL || process.env.POSTGRES_URL), {
         dialect: "postgres",

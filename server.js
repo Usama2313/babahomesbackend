@@ -65,7 +65,10 @@ const startServer = async () => {
         }
     } catch (error) {
         console.error("Unable to connect to database:", error.message);
-        if (process.env.NODE_ENV !== "production") process.exit(1);
+        // Only exit in development. In production (Vercel), let the app handle the error.
+        if (process.env.NODE_ENV !== "production") {
+            process.exit(1);
+        }
     }
 };
 

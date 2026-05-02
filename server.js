@@ -17,7 +17,7 @@ const allowedOrigins = [
     "http://localhost:3000",
     "http://localhost:5173",
     "https://thriving-alpaca-0d058a.netlify.app",
-    "https://cool-results-search.loca.lt"
+    "https://babahomesbackend.vercel.app"
 ];
 
 
@@ -27,13 +27,14 @@ app.use(cors({
     origin: function (origin, callback) {
         // allow requests with no origin (like mobile apps or curl requests)
         if (!origin) return callback(null, true);
-        
-        const isAllowed = allowedOrigins.indexOf(origin) !== -1 || 
-                         origin.includes("localhost") ||
-                         origin.includes("127.0.0.1") ||
-                         origin.endsWith(".loca.lt") || 
-                         origin.endsWith(".ngrok-free.app") ||
-                         origin.endsWith(".ngrok.io");
+
+        const isAllowed = allowedOrigins.indexOf(origin) !== -1 ||
+            origin.includes("localhost") ||
+            origin.includes("127.0.0.1") ||
+            origin.endsWith(".loca.lt") ||
+            origin.endsWith(".netlify.app") ||
+            origin.endsWith(".vercel.app") ||
+            origin.endsWith(".ngrok-free.app");
 
         if (isAllowed) {
             return callback(null, true);
@@ -52,6 +53,7 @@ app.use("/api/properties", propertyRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/chat", chatRoutes);
 app.get("/api/health", (req, res) => res.json({ status: "ok", time: new Date() }));
+app.get("/", (req, res) => res.json({ message: "Baba Homs API is running", status: "ok" }));
 
 const PORT = process.env.PORT || 5000;
 
@@ -102,4 +104,11 @@ const startServer = async () => {
     }
 };
 
-startServer();
+if (process.env.NODE_ENV !== "production") {
+    startServer();
+} else {
+    // On Vercel, just sync the DB (if needed) and export
+    sequelize.sync().then(() => console.log("Database synced for production"));
+}
+
+module.exports = app;

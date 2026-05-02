@@ -21,21 +21,7 @@ const allowedOrigins = [
 ];
 
 app.use(cors({
-    origin: function (origin, callback) {
-        if (!origin) return callback(null, true);
-
-        const isAllowed = allowedOrigins.indexOf(origin) !== -1 ||
-            origin.includes("localhost") ||
-            origin.includes("127.0.0.1") ||
-            origin.endsWith(".netlify.app") ||
-            origin.endsWith(".vercel.app");
-
-        if (isAllowed) {
-            return callback(null, true);
-        } else {
-            return callback(new Error('CORS policy error'), false);
-        }
-    },
+    origin: "*",
     credentials: true
 }));
 

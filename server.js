@@ -100,11 +100,6 @@ const startServer = async () => {
 
 if (process.env.NODE_ENV !== "production") {
     startServer();
-} else {
-    // On Vercel, attempt sync but don't crash if it fails
-    sequelize.sync()
-        .then(() => console.log("Database synced for production"))
-        .catch(err => console.error("Production DB Sync Error:", err.message));
 }
 
 module.exports = app;

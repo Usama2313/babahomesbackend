@@ -16,7 +16,7 @@ const auth = (req, res, next) => {
             return res.status(401).json({ message: "No token, authorization denied" });
         }
 
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const decoded = jwt.verify(token, process.env.JWT_SECRET || "babahoms_fallback_secret_key_123");
         req.user = decoded;
         next();
     } catch (err) {
@@ -111,7 +111,7 @@ router.get("/:id", async (req, res) => {
         const token = req.header("Authorization")?.replace("Bearer ", "");
         if (token) {
             try {
-                const decoded = jwt.verify(token, process.env.JWT_SECRET);
+                const decoded = jwt.verify(token, process.env.JWT_SECRET || "babahoms_fallback_secret_key_123");
                 const user = await User.findByPk(decoded.id);
                 if (user) {
                     sendWhatsAppNotification(

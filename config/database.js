@@ -5,7 +5,7 @@ const isPostgres = process.env.DATABASE_URL || process.env.POSTGRES_URL || proce
 
 const sequelize = (process.env.DATABASE_URL || process.env.POSTGRES_URL)
     ? new Sequelize((process.env.DATABASE_URL || process.env.POSTGRES_URL), {
-        dialect: 'mysql',
+        dialect: "postgres",
         logging: false,
         dialectOptions: {
             ssl: {

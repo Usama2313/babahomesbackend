@@ -6,6 +6,7 @@ const isPostgres = process.env.DATABASE_URL || process.env.POSTGRES_URL || proce
 const sequelize = (process.env.DATABASE_URL || process.env.POSTGRES_URL)
     ? new Sequelize((process.env.DATABASE_URL || process.env.POSTGRES_URL), {
         dialect: "postgres",
+        dialectModule: require("pg"),
         logging: false,
         dialectOptions: {
             ssl: {
@@ -22,6 +23,7 @@ const sequelize = (process.env.DATABASE_URL || process.env.POSTGRES_URL)
             host: process.env.DB_HOST,
             port: process.env.DB_PORT || (isPostgres ? 5432 : 3306),
             dialect: process.env.DB_DIALECT || "mysql",
+            dialectModule: isPostgres ? require("pg") : undefined,
             logging: false,
             dialectOptions: isPostgres ? {
                 ssl: {

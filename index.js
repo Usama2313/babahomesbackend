@@ -16,6 +16,22 @@ try {
 
     // Basic routes that don't need the database immediately
     app.get("/", (req, res) => res.json({ message: "Baba Homs API is running", status: "ok" }));
+
+    // Add a manual sync route to build tables in the correct Vercel Postgres branch
+    app.get("/api/sync", async (req, res) => {
+        try {
+            const sequelize = require("./config/database");
+            require("./models/associations"); // Make sure models are loaded before sync
+            await sequelize.sync({ alter: true });
+            res.json({ status: "ok", message: "Database tables synchronized successfully!" });
+        } catch (err) {
+            res.status(500).json({
+                status: "error",
+                message: "Sync failed: " + err.message
+            });
+        }
+    });
+
     app.get("/api/health", async (req, res) => {
         try {
             const sequelize = require("./config/database");

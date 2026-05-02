@@ -16,20 +16,16 @@ const validateWhatsAppNumber = async (phone) => {
         // Ensure number has '+' prefix
         const formattedPhone = phone.startsWith('+') ? phone : `+${phone.replace(/\D/g, '')}`;
 
-        // Use Twilio Lookup v2
-        const lookup = await client.lookups.v2.phoneNumbers(formattedPhone)
-            .fetch({ fields: 'line_type_intelligence' });
-
-        // If the number is a valid mobile number, we consider it a potential WhatsApp number
-        // (Most WhatsApp accounts are linked to mobile numbers)
-        if (lookup.lineTypeIntelligence && lookup.lineTypeIntelligence.type === 'mobile') {
+        // Simply check if it's a reasonable length for a phone number for now
+        // Twilio lookups cost money and fail if the account isn't configured for line_type_intelligence
+        if (formattedPhone.length >= 10 && formattedPhone.length <= 15) {
             return true;
         }
 
         return false;
     } catch (err) {
-        console.error("Twilio Verification Error:", err.message);
-        return false;
+        console.error("Verification Error:", err.message);
+        return true; // Bypass on error so users can still register
     }
 };
 

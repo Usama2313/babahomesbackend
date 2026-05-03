@@ -99,6 +99,11 @@ const Property = sequelize.define(
             },
         },
 
+        views: {
+            type: DataTypes.INTEGER,
+            defaultValue: 0,
+        },
+
         owner: {
             type: DataTypes.INTEGER,
             allowNull: true,

@@ -20,13 +20,28 @@ const auth = (req, res, next) => {
     }
 };
 
-// Censorship function to block numbers, whatsapp, and social links
+// Censorship function to block numbers, links, and contact details
 const censorContent = (text) => {
-    // Regex for phone numbers/whatsapp (covers words like 'whatsapp', 'number', 'call', 'digits')
-    const phoneRegex = /(\+?\d[\d\s-]{7,}\d)|(whatsapp|number|call|phone|contact|mobile|social|instagram|facebook|snapchat|linkedin|tiktok|link|http|www\.)/gi;
+    if (!text) return text;
 
-    if (phoneRegex.test(text)) {
-        return "[Message blocked]";
+    // 1. Check for links/URLs (e.g. www.google.com, http://..., example.com, and space-bypasses like 'www google com')
+    const urlRegex = /(https?:\/\/|www\.)[^\s]+|([a-z0-9]+([\.\-]{1}[a-z0-9]+)*\.[a-z]{2,5}(:[0-9]{1,5})?(\/.*)?)/gi;
+    const urlBypassRegex = /\b[a-z0-9]{2,}[\s\.\-]{1,3}(com|net|org|in|io|co|biz|info|website|app|online)\b/gi;
+
+    // 2. Check for digits (6 or more, with common separators)
+    const digitRegex = /(\+?\d[\d\s-]{5,}\d)/gi;
+
+    // 3. Check for word-based numbers (e.g. "three two three")
+    const numberWords = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine"];
+    // This matches 2 or more number words separated by spaces or dashes (more aggressive)
+    const wordNumPattern = `(${numberWords.join("|")})[\\s-]*(?:${numberWords.join("|")})`;
+    const wordNumRegex = new RegExp(wordNumPattern, "gi");
+
+    // 4. Contact keywords
+    const keywordsRegex = /(whatsapp|number|call|phone|contact|mobile|social|instagram|facebook|snapchat|linkedin|tiktok|telegram|babaair)/gi;
+
+    if (urlRegex.test(text) || urlBypassRegex.test(text) || digitRegex.test(text) || wordNumRegex.test(text) || keywordsRegex.test(text)) {
+        return "[Message blocked: Links or contact details are not allowed]";
     }
     return text;
 };
@@ -55,8 +70,14 @@ router.post("/send", auth, async (req, res) => {
             return res.status(403).json({ message: "Chat restricted." });
         }
 
-        // We store the ORIGINAL content now, so Company can see it.
-        // We will censor it on the fly in the retrieval routes.
+        // Block restricted content for non-admin/company users
+        if (!isCompany) {
+            const censored = censorContent(content);
+            if (censored.includes("[Message blocked")) {
+                return res.status(400).json({ message: "Sharing links or contact details is not allowed." });
+            }
+        }
+
         const message = await Message.create({
             senderId: req.user.id,
             receiverId,

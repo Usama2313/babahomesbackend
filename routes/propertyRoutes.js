@@ -107,6 +107,11 @@ router.get("/:id", async (req, res) => {
 
         if (!property) return res.status(404).json({ message: "Property not found" });
 
+        // Increment views
+        await property.increment("views");
+        // Reload to get the updated view count in response
+        await property.reload();
+
         // Get user details from request (if logged in)
         const token = req.header("Authorization")?.replace("Bearer ", "");
         if (token) {

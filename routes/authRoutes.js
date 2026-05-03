@@ -306,6 +306,111 @@ router.get("/company-user", async (req, res) => {
     }
 });
 
+// GET Admin Stats for Dashboard
+router.get("/admin/stats", auth, async (req, res) => {
+    try {
+        const admin = await User.findByPk(req.user.id);
+        if (admin.role !== 'Admin' && admin.role !== 'Company') {
+            return res.status(403).json({ message: "Access denied" });
+        }
+
+        const Property = require("../models/Property");
+        const totalUsers = await User.count();
+        const totalProperties = await Property.count();
+        const agents = await User.count({ where: { role: "Agent" } });
+        const sellers = await User.count({ where: { role: "Property Seller" } });
+        
+        // Sum of all property views
+        const totalViews = await Property.sum("views") || 0;
+
+        res.json({
+            totalUsers,
+            totalProperties,
+            agents,
+            sellers,
+            totalViews
+        });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+});
+
+// Forgot Password - Generate Token & Send Email
+router.post("/forgot-password", async (req, res) => {
+    const { email } = req.body;
+    try {
+        const user = await User.findOne({ where: { email } });
+        if (!user) return res.status(404).json({ message: "No user found with this email." });
+
+        const resetToken = jwt.sign(
+            { id: user.id },
+            process.env.JWT_SECRET || "babahoms_fallback_secret_key_123",
+            { expiresIn: "1h" }
+        );
+
+        const resetLink = `https://thriving-alpaca-0d058a.netlify.app/reset-password/${resetToken}`;
+
+        // Send Email
+        const nodemailer = require("nodemailer");
+        const transporter = nodemailer.createTransport({
+            host: process.env.SMTP_HOST || "smtp.ethereal.email",
+            port: process.env.SMTP_PORT || 587,
+            auth: {
+                user: process.env.SMTP_USER || "placeholder_user",
+                pass: process.env.SMTP_PASS || "placeholder_pass"
+            }
+        });
+
+        const mailOptions = {
+            from: '"Baba Homs Support" <support@babahoms.com>',
+            to: user.email,
+            subject: "Password Reset Request - Baba Homs",
+            html: `
+                <div style="font-family: Arial, sans-serif; padding: 20px; border: 1px solid #eee; border-radius: 10px;">
+                    <h2 style="color: #1e293b;">Password Reset</h2>
+                    <p>Hello ${user.name},</p>
+                    <p>You requested a password reset. Please click the button below to reset your password. This link will expire in 1 hour.</p>
+                    <a href="${resetLink}" style="display: inline-block; padding: 12px 24px; background: #1e293b; color: #fff; text-decoration: none; border-radius: 5px; margin: 20px 0;">Reset Password</a>
+                    <p>If you didn't request this, you can safely ignore this email.</p>
+                    <p>Best regards,<br/>Baba Homs Team</p>
+                </div>
+            `
+        };
+
+        // If no real SMTP, just log it
+        if (!process.env.SMTP_HOST) {
+            console.log("-----------------------------------------");
+            console.log("RESET LINK LOGGED (NO SMTP CONFIGURED):");
+            console.log(resetLink);
+            console.log("-----------------------------------------");
+            return res.json({ message: "Password reset link has been generated and logged. (In production, this would be an email)." });
+        }
+
+        await transporter.sendMail(mailOptions);
+        res.json({ message: "Password reset link has been sent to your email." });
+
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+});
+
+// Reset Password - Verify Token & Update Password
+router.post("/reset-password", async (req, res) => {
+    const { token, newPassword } = req.body;
+    try {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET || "babahoms_fallback_secret_key_123");
+        const user = await User.findByPk(decoded.id);
+        if (!user) return res.status(404).json({ message: "User not found." });
+
+        const hashedPassword = await bcrypt.hash(newPassword, 10);
+        await user.update({ password: hashedPassword });
+
+        res.json({ message: "Password has been reset successfully. You can now login." });
+    } catch (error) {
+        res.status(400).json({ message: "Invalid or expired token." });
+    }
+});
+
 // Get user basic info by ID (Required for Chat)
 router.get("/user/:id", async (req, res) => {
     try {

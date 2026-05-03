@@ -94,19 +94,32 @@ router.post("/send", auth, async (req, res) => {
 router.get("/conversation/:propertyId/:otherUserId", auth, async (req, res) => {
     try {
         const { propertyId, otherUserId } = req.params;
-        if (req.user.id === parseInt(otherUserId)) {
-            return res.status(400).json({ message: "You cannot chat with yourself." });
-        }
+        const senderId = req.query.senderId; // Optional: used by Admin to specify both sides
 
         const currentUser = await User.findByPk(req.user.id);
         const isCompany = currentUser.role === "Company" || currentUser.role === "Admin";
 
-        const where = {
-            [Op.or]: [
-                { senderId: req.user.id, receiverId: otherUserId },
-                { senderId: otherUserId, receiverId: req.user.id },
-            ],
-        };
+        let where;
+        if (isCompany && senderId) {
+            // Admin spectating two other users
+            where = {
+                [Op.or]: [
+                    { senderId: senderId, receiverId: otherUserId },
+                    { senderId: otherUserId, receiverId: senderId },
+                ],
+            };
+        } else {
+            // Normal user or Admin chatting directly
+            if (req.user.id === parseInt(otherUserId)) {
+                return res.status(400).json({ message: "You cannot chat with yourself." });
+            }
+            where = {
+                [Op.or]: [
+                    { senderId: req.user.id, receiverId: otherUserId },
+                    { senderId: otherUserId, receiverId: req.user.id },
+                ],
+            };
+        }
 
         if (propertyId !== "null" && propertyId !== "direct" && propertyId !== "0") {
             where.propertyId = propertyId;
@@ -131,7 +144,7 @@ router.get("/conversation/:propertyId/:otherUserId", auth, async (req, res) => {
             order: [["createdAt", "ASC"]],
         });
 
-        // Censor on the fly for non-company users
+        // Processing messages
         const processedMessages = messages.map(msg => {
             const data = msg.toJSON();
             if (!isCompany) {
@@ -164,21 +177,16 @@ router.get("/conversations", auth, async (req, res) => {
             order: [["createdAt", "DESC"]],
         });
 
-        // Group by conversation
         const conversations = [];
         const seen = new Set();
 
         for (const msg of messages) {
-            const otherId = msg.senderId === req.user.id ? msg.receiverId : msg.senderId;
-            // For Admin, we need to distinguish conversations between user A and user B on property X
-            const key = isAdmin ? `${msg.propertyId}-${msg.senderId}-${msg.receiverId}` : `${msg.propertyId}-${otherId}`;
+            // Create a unique key for the pair [UserA, UserB] on PropertyX
+            const participants = [msg.senderId, msg.receiverId].sort();
+            const key = `${msg.propertyId}-${participants[0]}-${participants[1]}`;
 
             if (!seen.has(key)) {
                 seen.add(key);
-
-                // For admin, "otherUser" is the person they are NOT (if they are in the chat) 
-                // OR just the sender if they are spectating.
-                const targetId = isAdmin ? msg.senderId : otherId;
 
                 const sender = await User.findByPk(msg.senderId, { attributes: ["id", "name", "role", "phone", "email", "profilePicture"] });
                 const receiver = await User.findByPk(msg.receiverId, { attributes: ["id", "name", "role", "phone", "email", "profilePicture"] });

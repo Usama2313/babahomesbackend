@@ -107,23 +107,50 @@ router.get("/:id", async (req, res) => {
 
         if (!property) return res.status(404).json({ message: "Property not found" });
 
-        // Increment views
-        await property.increment("views");
-        // Reload to get the updated view count in response
-        await property.reload();
-
-        // Get user details from request (if logged in)
+        // Unique View Tracking
+        const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+        let userId = null;
         const token = req.header("Authorization")?.replace("Bearer ", "");
         if (token) {
             try {
                 const decoded = jwt.verify(token, process.env.JWT_SECRET || "babahoms_fallback_secret_key_123");
-                const user = await User.findByPk(decoded.id);
-                if (user) {
+                userId = decoded.id;
+            } catch (err) { /* token invalid, ignore */ }
+        }
+
+        // Check if this user/IP has viewed this property in the last 24 hours
+        const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+        const PropertyView = require("../models/PropertyView");
+        const existingView = await PropertyView.findOne({
+            where: {
+                propertyId: property.id,
+                [Op.or]: [
+                    ...(userId ? [{ userId }] : []),
+                    { ipAddress: ip }
+                ],
+                createdAt: { [Op.gt]: twentyFourHoursAgo }
+            }
+        });
+
+        if (!existingView) {
+            await property.increment("views");
+            await PropertyView.create({
+                propertyId: property.id,
+                userId,
+                ipAddress: ip
+            });
+            // Reload to get the updated view count
+            await property.reload();
+
+            // Notify company about the NEW view
+            if (userId) {
+                const viewer = await User.findByPk(userId);
+                if (viewer) {
                     sendWhatsAppNotification(
-                        `User View Alert!\nName: ${user.name}\nEmail: ${user.email}\nWhatsApp: ${user.phone}\nProperty: ${property.title}\nProperty ID: ${property.id}`
+                        `*Property View Alert*\nProperty: ${property.title}\nViewer: ${viewer.name}\nWhatsApp: ${viewer.phone}\nRole: ${viewer.role}`
                     );
                 }
-            } catch (err) { /* Not logged in or invalid token, skip notification */ }
+            }
         }
 
         res.json(property);

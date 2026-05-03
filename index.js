@@ -45,6 +45,34 @@ try {
         }
     });
 
+    app.get("/api/fix-db", async (req, res) => {
+        try {
+            const sequelize = require("./config/database");
+            await sequelize.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS "isBlocked" BOOLEAN DEFAULT false;');
+            await sequelize.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS "isVerified" BOOLEAN DEFAULT false;');
+            await sequelize.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS "lastLogin" TIMESTAMP WITH TIME ZONE;');
+            await sequelize.query('ALTER TABLE properties ADD COLUMN IF NOT EXISTS "isApproved" BOOLEAN DEFAULT true;');
+            await sequelize.query('ALTER TABLE properties ADD COLUMN IF NOT EXISTS "isFeatured" BOOLEAN DEFAULT false;');
+            await sequelize.query('ALTER TABLE properties ADD COLUMN IF NOT EXISTS "views" INTEGER DEFAULT 0;');
+            await sequelize.query(`
+                CREATE TABLE IF NOT EXISTS "property_views" (
+                    "id" SERIAL PRIMARY KEY,
+                    "propertyId" INTEGER NOT NULL,
+                    "userId" INTEGER,
+                    "ipAddress" VARCHAR(255),
+                    "createdAt" TIMESTAMP WITH TIME ZONE NOT NULL,
+                    "updatedAt" TIMESTAMP WITH TIME ZONE NOT NULL
+                );
+            `);
+            res.json({ status: "ok", message: "Database raw SQL fix applied successfully!" });
+        } catch (err) {
+            res.status(500).json({
+                status: "error",
+                message: "Raw DB fix failed: " + err.message
+            });
+        }
+    });
+
     app.get("/api/health", async (req, res) => {
         try {
             const sequelize = require("./config/database");

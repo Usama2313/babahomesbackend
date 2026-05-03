@@ -32,6 +32,19 @@ try {
         }
     });
 
+    app.get("/api/create-admin", async (req, res) => {
+        try {
+            const createAdmin = require("./createAdminFunc"); // I will create this file
+            await createAdmin();
+            res.json({ status: "ok", message: "Admin user created/updated successfully!" });
+        } catch (err) {
+            res.status(500).json({
+                status: "error",
+                message: "Admin creation failed: " + err.message
+            });
+        }
+    });
+
     app.get("/api/health", async (req, res) => {
         try {
             const sequelize = require("./config/database");

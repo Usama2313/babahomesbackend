@@ -73,6 +73,47 @@ try {
         }
     });
 
+    app.get("/api/test-email", async (req, res) => {
+        try {
+            const nodemailer = require("nodemailer");
+            const transporter = nodemailer.createTransport({
+                host: process.env.SMTP_HOST || "smtp.gmail.com",
+                port: parseInt(process.env.SMTP_PORT || 587),
+                secure: false, // true for 465, false for other ports
+                auth: {
+                    user: process.env.SMTP_USER,
+                    pass: process.env.SMTP_PASS
+                },
+                tls: {
+                    rejectUnauthorized: false
+                }
+            });
+
+            const mailOptions = {
+                from: `"Baba Homs Diagnostics" <${process.env.SMTP_USER}>`,
+                to: "utanveer484@gmail.com", // Sending test to user's email
+                subject: "Test Email from Vercel Backend",
+                text: "If you receive this, the Vercel backend SMTP configuration is working correctly."
+            };
+
+            const info = await transporter.sendMail(mailOptions);
+            res.json({
+                status: "success",
+                message: "Test email sent!",
+                info: info,
+                env_user_exists: !!process.env.SMTP_USER,
+                env_pass_exists: !!process.env.SMTP_PASS
+            });
+        } catch (error) {
+            res.status(500).json({
+                status: "error",
+                message: error.message,
+                code: error.code,
+                command: error.command
+            });
+        }
+    });
+
     app.get("/api/health", async (req, res) => {
         try {
             const sequelize = require("./config/database");

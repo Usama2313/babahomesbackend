@@ -4,7 +4,7 @@ const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const { Op } = require("sequelize");
 const User = require("../models/User.js");
-
+const nodemailer = require("nodemailer");
 const router = express.Router();
 
 const twilio = require('twilio');
@@ -353,7 +353,7 @@ router.post("/forgot-password", async (req, res) => {
         const resetLink = `https://thriving-alpaca-0d058a.netlify.app/reset-password/${resetToken}`;
 
         // Send Email
-        const nodemailer = require("nodemailer");
+
         const transporter = nodemailer.createTransport({
             host: process.env.SMTP_HOST || "smtp.gmail.com",
             port: parseInt(process.env.SMTP_PORT || 587),

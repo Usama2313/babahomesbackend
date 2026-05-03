@@ -108,6 +108,14 @@ const Property = sequelize.define(
             type: DataTypes.INTEGER,
             allowNull: true,
         },
+        isApproved: {
+            type: DataTypes.BOOLEAN,
+            defaultValue: true, // Auto-approve for now, can be changed later
+        },
+        isFeatured: {
+            type: DataTypes.BOOLEAN,
+            defaultValue: false,
+        },
     },
     {
         tableName: "properties",

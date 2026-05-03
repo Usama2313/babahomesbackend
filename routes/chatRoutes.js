@@ -84,6 +84,25 @@ router.post("/send", auth, async (req, res) => {
             propertyId,
             content: content,
         });
+
+        // SMS Notification to Admin/Company
+        if (receiver.role === "Company" || receiver.role === "Admin") {
+            try {
+                if (process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && process.env.TWILIO_PHONE_NUMBER) {
+                    const twilio = require('twilio');
+                    const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
+                    await client.messages.create({
+                        body: `Baba Homs: New message from ${sender.name} (${sender.phone}). Message: ${content.substring(0, 60)}${content.length > 60 ? '...' : ''}`,
+                        from: process.env.TWILIO_PHONE_NUMBER,
+                        to: receiver.phone
+                    });
+                    console.log(`SMS alert sent to admin: ${receiver.name}`);
+                }
+            } catch (smsErr) {
+                console.error("SMS notification failed:", smsErr.message);
+            }
+        }
+
         res.status(201).json(message);
     } catch (error) {
         res.status(500).json({ message: error.message });

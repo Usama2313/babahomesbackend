@@ -21,6 +21,7 @@ const PropertyView = sequelize.define("PropertyView", {
     },
 }, {
     timestamps: true,
+    tableName: "property_views",
 });
 
 module.exports = PropertyView;

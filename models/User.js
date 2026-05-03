@@ -50,6 +50,17 @@ const User = sequelize.define(
         country: {
             type: DataTypes.STRING,
         },
+        isBlocked: {
+            type: DataTypes.BOOLEAN,
+            defaultValue: false,
+        },
+        isVerified: {
+            type: DataTypes.BOOLEAN,
+            defaultValue: false,
+        },
+        lastLogin: {
+            type: DataTypes.DATE,
+        },
     },
     {
         tableName: "users",

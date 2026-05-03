@@ -49,7 +49,7 @@ router.get("/", async (req, res) => {
         if (search) {
             const isPostgres = Property.sequelize.getDialect() === 'postgres';
             const likeOp = isPostgres ? Op.iLike : Op.like;
-            
+
             where[Op.or] = [
                 { title: { [likeOp]: `%${search}%` } },
                 { city: { [likeOp]: `%${search}%` } },
@@ -121,16 +121,22 @@ router.get("/:id", async (req, res) => {
         // Check if this user/IP has viewed this property in the last 24 hours
         const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
         const PropertyView = require("../models/PropertyView");
-        const existingView = await PropertyView.findOne({
-            where: {
-                propertyId: property.id,
-                [Op.or]: [
-                    ...(userId ? [{ userId }] : []),
-                    { ipAddress: ip }
-                ],
-                createdAt: { [Op.gt]: twentyFourHoursAgo }
-            }
-        });
+        
+        let viewWhere = {
+            propertyId: property.id,
+            createdAt: { [Op.gt]: twentyFourHoursAgo }
+        };
+
+        if (userId) {
+            // If logged in, track by userId (ignore IP to allow multiple accounts on same machine)
+            viewWhere.userId = userId;
+        } else {
+            // If guest, track by IP
+            viewWhere.ipAddress = ip;
+            viewWhere.userId = null;
+        }
+
+        const existingView = await PropertyView.findOne({ where: viewWhere });
 
         if (!existingView) {
             await property.increment("views");
@@ -230,10 +236,10 @@ router.delete("/:id", auth, async (req, res) => {
 router.post("/generate-description", async (req, res) => {
     try {
         const { bhkType, builtUpArea, city, locality, apartmentType, rentAmount, amenities } = req.body;
-        
+
         const adjectives = ["luxurious", "spacious", "modern", "well-ventilated", "centrally located", "premium"];
         const adj = adjectives[Math.floor(Math.random() * adjectives.length)];
-        
+
         const description = `Discover this ${adj} ${bhkType} ${apartmentType} in the heart of ${locality}, ${city}. 
 Spanning over ${builtUpArea} sq.ft., this home is designed for comfort and style. 
 Located in a vibrant neighborhood, it offers easy access to local essentials. 
@@ -242,6 +248,55 @@ Ideal for families or professionals looking for a high-quality living experience
 Available for rent at ₹${rentAmount}/month. Contact us for a private viewing.`;
 
         res.json({ description });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+});
+
+// ADMIN: Get all properties for moderation
+router.get("/admin/all", auth, async (req, res) => {
+    try {
+        const admin = await User.findByPk(req.user.id);
+        if (admin.role !== 'Admin' && admin.role !== 'Company') {
+            return res.status(403).json({ message: "Access denied" });
+        }
+        const properties = await Property.findAll({
+            order: [['createdAt', 'DESC']],
+            include: [{ model: User, as: 'ownerDetails', attributes: ['name', 'email'] }]
+        });
+        res.json(properties);
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+});
+
+// ADMIN: Update any property
+router.put("/admin/:id", auth, async (req, res) => {
+    try {
+        const admin = await User.findByPk(req.user.id);
+        if (admin.role !== 'Admin' && admin.role !== 'Company') {
+            return res.status(403).json({ message: "Access denied" });
+        }
+        const property = await Property.findByPk(req.params.id);
+        if (!property) return res.status(404).json({ message: "Property not found" });
+        await property.update(req.body);
+        res.json(property);
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+});
+
+// ADMIN: Delete any property
+router.delete("/admin/:id", auth, async (req, res) => {
+    try {
+        const admin = await User.findByPk(req.user.id);
+        if (admin.role !== 'Admin' && admin.role !== 'Company') {
+            return res.status(403).json({ message: "Access denied" });
+        }
+        const property = await Property.findByPk(req.params.id);
+        if (!property) return res.status(404).json({ message: "Property not found" });
+        await property.destroy();
+        res.json({ message: "Property deleted" });
     } catch (error) {
         res.status(500).json({ message: error.message });
     }

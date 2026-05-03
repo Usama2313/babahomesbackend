@@ -106,6 +106,8 @@ router.post("/login", async (req, res) => {
             process.env.JWT_SECRET || "babahoms_fallback_secret_key_123"
         );
 
+        await user.update({ lastLogin: new Date() });
+
         const userData = user.toJSON();
         delete userData.password;
 
@@ -319,7 +321,7 @@ router.get("/admin/stats", auth, async (req, res) => {
         const totalProperties = await Property.count();
         const agents = await User.count({ where: { role: "Agent" } });
         const sellers = await User.count({ where: { role: "Property Seller" } });
-        
+
         // Sum of all property views
         const totalViews = await Property.sum("views") || 0;
 
@@ -353,16 +355,20 @@ router.post("/forgot-password", async (req, res) => {
         // Send Email
         const nodemailer = require("nodemailer");
         const transporter = nodemailer.createTransport({
-            host: process.env.SMTP_HOST || "smtp.ethereal.email",
-            port: process.env.SMTP_PORT || 587,
+            host: process.env.SMTP_HOST || "smtp.gmail.com",
+            port: parseInt(process.env.SMTP_PORT || 587),
+            secure: false, // true for 465, false for other ports
             auth: {
-                user: process.env.SMTP_USER || "placeholder_user",
-                pass: process.env.SMTP_PASS || "placeholder_pass"
+                user: process.env.SMTP_USER,
+                pass: process.env.SMTP_PASS
+            },
+            tls: {
+                rejectUnauthorized: false
             }
         });
 
         const mailOptions = {
-            from: '"Baba Homs Support" <support@babahoms.com>',
+            from: `"Baba Homs Support" <${process.env.SMTP_USER}>`,
             to: user.email,
             subject: "Password Reset Request - Baba Homs",
             html: `
@@ -387,10 +393,15 @@ router.post("/forgot-password", async (req, res) => {
         }
 
         await transporter.sendMail(mailOptions);
+        console.log(`Password reset email sent to: ${user.email}`);
         res.json({ message: "Password reset link has been sent to your email." });
 
     } catch (error) {
-        res.status(500).json({ message: error.message });
+        console.error("FORGOT PASSWORD ERROR:", error);
+        res.status(500).json({
+            message: "Failed to send email. " + error.message,
+            detail: error.code // helpful for debugging SMTP issues like 'EAUTH'
+        });
     }
 });
 

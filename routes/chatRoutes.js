@@ -106,39 +106,39 @@ router.post("/send", auth, async (req, res) => {
 // Get messages for a specific property between two users
 router.get("/conversation/:propertyId/:otherUserId", auth, async (req, res) => {
     try {
-        const { propertyId, otherUserId } = req.params;
-        const senderId = req.query.senderId; // Optional: used by Admin to specify both sides
+        const cleanId = (id) => (id === "null" || id === "undefined" || id === "0" || id === "direct") ? null : id;
+        const pId = cleanId(propertyId);
+        const oUserId = cleanId(otherUserId);
+        const sId = cleanId(senderId);
 
         const currentUser = await User.findByPk(req.user.id);
         const isCompany = currentUser.role === "Company" || currentUser.role === "Admin";
 
+        if (!oUserId) return res.status(400).json({ message: "Invalid user ID" });
+
         let where;
-        if (isCompany && senderId) {
+        if (isCompany && sId) {
             // Admin spectating two other users
             where = {
                 [Op.or]: [
-                    { senderId: senderId, receiverId: otherUserId },
-                    { senderId: otherUserId, receiverId: senderId },
+                    { senderId: sId, receiverId: oUserId },
+                    { senderId: oUserId, receiverId: sId },
                 ],
             };
         } else {
             // Normal user or Admin chatting directly
-            if (req.user.id === parseInt(otherUserId)) {
+            if (req.user.id === parseInt(oUserId)) {
                 return res.status(400).json({ message: "You cannot chat with yourself." });
             }
             where = {
                 [Op.or]: [
-                    { senderId: req.user.id, receiverId: otherUserId },
-                    { senderId: otherUserId, receiverId: req.user.id },
+                    { senderId: req.user.id, receiverId: oUserId },
+                    { senderId: oUserId, receiverId: req.user.id },
                 ],
             };
         }
 
-        if (propertyId !== "null" && propertyId !== "direct" && propertyId !== "0") {
-            where.propertyId = propertyId;
-        } else {
-            where.propertyId = null;
-        }
+        where.propertyId = pId;
 
         const messages = await Message.findAll({
             where,
@@ -244,13 +244,17 @@ router.get("/admin/all-messages", auth, async (req, res) => {
 // Check Agent availability (1 hour logic)
 router.get("/check-availability/:propertyId/:agentId", auth, async (req, res) => {
     try {
-        const { propertyId, agentId } = req.params;
+        const cleanId = (id) => (id === "null" || id === "undefined" || id === "0") ? null : id;
+        const pId = cleanId(req.params.propertyId);
+        const aId = cleanId(req.params.agentId);
+
+        if (!aId) return res.status(400).json({ message: "Invalid agent ID" });
 
         // Find last message from agent in this property conversation
         const lastMsg = await Message.findOne({
             where: {
-                propertyId,
-                senderId: agentId
+                propertyId: pId,
+                senderId: aId
             },
             order: [['createdAt', 'DESC']]
         });

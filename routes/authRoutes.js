@@ -454,7 +454,10 @@ router.post("/reset-password", async (req, res) => {
 // Get user basic info by ID (Required for Chat)
 router.get("/user/:id", async (req, res) => {
     try {
-        const user = await User.findByPk(req.params.id, {
+        const userId = req.params.id === "null" || req.params.id === "undefined" ? null : req.params.id;
+        if (!userId) return res.status(400).json({ message: "Invalid user ID" });
+
+        const user = await User.findByPk(userId, {
             attributes: ["id", "name", "role", "profilePicture", "lastLogin"]
         });
         if (!user) return res.status(404).json({ message: "User not found" });

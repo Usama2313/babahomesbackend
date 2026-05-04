@@ -101,7 +101,7 @@ router.get("/:id", async (req, res) => {
                 {
                     model: User,
                     as: "ownerDetails",
-                    attributes: ["name", "phone", "profilePicture"]
+                    attributes: ["id", "name", "phone", "profilePicture", "role"]
                 }
             ]
         });

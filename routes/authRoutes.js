@@ -135,6 +135,9 @@ const auth = (req, res, next) => {
         const decoded = jwt.verify(token, process.env.JWT_SECRET || "babahoms_fallback_secret_key_123");
         req.user = decoded;
 
+        // Background update of lastLogin to keep online status accurate
+        User.update({ lastLogin: new Date() }, { where: { id: decoded.id } }).catch(e => console.error("lastLogin update failed", e));
+
         next();
     } catch (err) {
         res.status(401).json({ message: "Token is not valid" });

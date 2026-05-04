@@ -106,6 +106,9 @@ router.post("/send", auth, async (req, res) => {
 // Get messages for a specific property between two users
 router.get("/conversation/:propertyId/:otherUserId", auth, async (req, res) => {
     try {
+        const { propertyId, otherUserId } = req.params;
+        const { senderId } = req.query;
+
         const cleanId = (id) => (id === "null" || id === "undefined" || id === "0" || id === "direct") ? null : id;
         const pId = cleanId(propertyId);
         const oUserId = cleanId(otherUserId);

@@ -379,7 +379,9 @@ router.post("/forgot-password", async (req, res) => {
             { expiresIn: "1h" }
         );
 
-        const resetLink = `https://thriving-alpaca-0d058a.netlify.app/reset-password/${resetToken}`;
+        // Update domain to match the current production site
+        const frontendUrl = process.env.FRONTEND_URL || "https://property-4u.netlify.app";
+        const resetLink = `${frontendUrl}/reset-password/${resetToken}`;
 
         // Send Email
 
@@ -428,8 +430,9 @@ router.post("/forgot-password", async (req, res) => {
     } catch (error) {
         console.error("FORGOT PASSWORD ERROR:", error);
         res.status(500).json({
-            message: "Failed to send email. " + error.message,
-            detail: error.code // helpful for debugging SMTP issues like 'EAUTH'
+            message: "Failed to send email. Please ensure your SMTP settings are correct.",
+            error: error.message,
+            code: error.code
         });
     }
 });

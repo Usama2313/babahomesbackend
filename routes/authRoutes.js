@@ -385,10 +385,10 @@ router.post("/forgot-password", async (req, res) => {
 
         // Send Email
 
-        const transporter = nodemailer.createTransport({
+        const smtpConfig = {
             host: process.env.SMTP_HOST || "smtp.gmail.com",
             port: parseInt(process.env.SMTP_PORT || 587),
-            secure: false, // true for 465, false for other ports
+            secure: false,
             auth: {
                 user: process.env.SMTP_USER,
                 pass: process.env.SMTP_PASS
@@ -396,7 +396,17 @@ router.post("/forgot-password", async (req, res) => {
             tls: {
                 rejectUnauthorized: false
             }
-        });
+        };
+
+        // Use service: 'gmail' if host is gmail for better compatibility
+        if (smtpConfig.host.includes("gmail")) {
+            delete smtpConfig.host;
+            delete smtpConfig.port;
+            delete smtpConfig.secure;
+            smtpConfig.service = 'gmail';
+        }
+
+        const transporter = nodemailer.createTransport(smtpConfig);
 
         const mailOptions = {
             from: `"Baba Homs Support" <${process.env.SMTP_USER}>`,
@@ -414,13 +424,16 @@ router.post("/forgot-password", async (req, res) => {
             `
         };
 
-        // If no real SMTP, just log it
-        if (!process.env.SMTP_HOST) {
+        // If no SMTP credentials, log it and return (to avoid crashing or hanging)
+        if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
             console.log("-----------------------------------------");
-            console.log("RESET LINK LOGGED (NO SMTP CONFIGURED):");
+            console.log("RESET LINK LOGGED (NO SMTP CREDENTIALS):");
             console.log(resetLink);
             console.log("-----------------------------------------");
-            return res.json({ message: "Password reset link has been generated and logged. (In production, this would be an email)." });
+            return res.json({ 
+                message: "Password reset link generated (Logged on server). Please configure SMTP credentials to send actual emails.",
+                resetLink: process.env.NODE_ENV === 'development' ? resetLink : undefined 
+            });
         }
 
         await transporter.sendMail(mailOptions);

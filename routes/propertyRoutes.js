@@ -31,6 +31,8 @@ router.get("/", async (req, res) => {
             country,
             city,
             type,
+            propertyType,
+            adType,
             category,
             search,
             owner,
@@ -43,6 +45,8 @@ router.get("/", async (req, res) => {
         if (country) where.country = country;
         if (city) where.city = city;
         if (type) where.type = type;
+        if (propertyType) where.propertyType = propertyType;
+        if (adType) where.adType = adType;
         if (category) where.category = category;
         if (owner) where.owner = owner;
 

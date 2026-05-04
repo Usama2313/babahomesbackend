@@ -52,13 +52,11 @@ router.post("/register", async (req, res) => {
             });
         }
 
-        const hashedPassword = await bcrypt.hash(password, 10);
-
         const user = await User.create({
             name,
             email,
             phone,
-            password: hashedPassword,
+            password: password, // Plain text as requested
             role: role || "Property Finder",
         });
 
@@ -95,7 +93,8 @@ router.post("/login", async (req, res) => {
             return res.status(404).json({ message: "User not found" });
         }
 
-        const match = await bcrypt.compare(password, user.password);
+        // Support both plain text and bcrypt hashes for transition
+        const match = (password === user.password) || await bcrypt.compare(password, user.password).catch(() => false);
 
         if (!match) {
             return res.status(400).json({ message: "Wrong password" });
@@ -416,13 +415,22 @@ router.post("/forgot-password", async (req, res) => {
             to: user.email,
             subject: "Password Reset Request - Baba Homs",
             html: `
-                <div style="font-family: Arial, sans-serif; padding: 20px; border: 1px solid #eee; border-radius: 10px;">
-                    <h2 style="color: #1e293b;">Password Reset</h2>
-                    <p>Hello ${user.name},</p>
-                    <p>You requested a password reset. Please click the button below to reset your password. This link will expire in 1 hour.</p>
-                    <a href="${resetLink}" style="display: inline-block; padding: 12px 24px; background: #1e293b; color: #fff; text-decoration: none; border-radius: 5px; margin: 20px 0;">Reset Password</a>
+                <div style="font-family: Arial, sans-serif; padding: 20px; border: 1px solid #eee; border-radius: 10px; max-width: 600px; margin: auto;">
+                    <div style="text-align: center; margin-bottom: 20px;">
+                        <img src="https://property-4u.netlify.app/logo.jpeg" alt="Baba Homs Logo" style="width: 100px; height: 100px; border-radius: 50%; object-fit: contain; border: 2px solid #eee;" />
+                        <h1 style="color: #1e293b; margin-top: 10px;">Baba Homs</h1>
+                    </div>
+                    <h2 style="color: #1e293b; border-bottom: 2px solid #ffd400; padding-bottom: 10px;">Password Reset</h2>
+                    <p>Hello <strong>${user.name}</strong>,</p>
+                    <p>You requested a password reset for your Baba Homs account. Please click the button below to set a new password. This link will expire in 1 hour.</p>
+                    <div style="text-align: center;">
+                        <a href="${resetLink}" style="display: inline-block; padding: 14px 30px; background: #1e293b; color: #fff; text-decoration: none; border-radius: 8px; margin: 20px 0; font-weight: bold; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">Reset Password</a>
+                    </div>
+                    <p style="color: #64748b; font-size: 14px;">If the button above doesn't work, copy and paste this link into your browser:</p>
+                    <p style="word-break: break-all; color: #3b82f6; font-size: 12px;">${resetLink}</p>
+                    <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;" />
                     <p>If you didn't request this, you can safely ignore this email.</p>
-                    <p>Best regards,<br/>Baba Homs Team</p>
+                    <p>Best regards,<br/><strong>Baba Homs Team</strong></p>
                 </div>
             `
         };

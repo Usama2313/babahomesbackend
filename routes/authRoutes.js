@@ -227,7 +227,16 @@ router.get("/admin/users", auth, async (req, res) => {
             return res.status(403).json({ message: "Access denied" });
         }
         const users = await User.findAll({ order: [['createdAt', 'DESC']] });
-        res.json(users);
+        // Determine online status (active within last 5 minutes)
+        const now = new Date();
+        const usersWithStatus = users.map(user => {
+            const lastLogin = user.lastLogin ? new Date(user.lastLogin) : null;
+            const isOnline = lastLogin && (now - lastLogin) < 5 * 60 * 1000; // 5 minutes
+            // Convert Sequelize instance to plain object if needed
+            const plain = user.toJSON ? user.toJSON() : user;
+            return { ...plain, isOnline };
+        });
+        res.json(usersWithStatus);
     } catch (error) {
         res.status(500).json({ message: error.message });
     }
@@ -288,6 +297,26 @@ router.delete("/admin/user/:id", auth, async (req, res) => {
         const user = await User.findByPk(req.params.id);
         if (!user) return res.status(404).json({ message: "User not found" });
 
+        const Property = require("../models/Property");
+        const Message = require("../models/Message");
+        const PropertyView = require("../models/PropertyView");
+
+        // 1. Delete user's properties and their related data
+        const properties = await Property.findAll({ where: { owner: user.id } });
+        for (const p of properties) {
+            await PropertyView.destroy({ where: { propertyId: p.id } });
+            await Message.destroy({ where: { propertyId: p.id } });
+            await p.destroy();
+        }
+
+        // 2. Delete all messages involving this user
+        await Message.destroy({
+            where: {
+                [Op.or]: [{ senderId: user.id }, { receiverId: user.id }]
+            }
+        });
+
+        // 3. Finally delete the user
         await user.destroy();
         res.json({ message: "User deleted successfully" });
     } catch (error) {
@@ -426,7 +455,7 @@ router.post("/reset-password", async (req, res) => {
 router.get("/user/:id", async (req, res) => {
     try {
         const user = await User.findByPk(req.params.id, {
-            attributes: ["id", "name", "role", "profilePicture"]
+            attributes: ["id", "name", "role", "profilePicture", "lastLogin"]
         });
         if (!user) return res.status(404).json({ message: "User not found" });
         res.json(user);

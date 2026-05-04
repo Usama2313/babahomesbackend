@@ -88,18 +88,12 @@ router.post("/send", auth, async (req, res) => {
         // SMS Notification to Admin/Company
         if (receiver.role === "Company" || receiver.role === "Admin") {
             try {
-                if (process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && process.env.TWILIO_PHONE_NUMBER) {
-                    const twilio = require('twilio');
-                    const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
-                    await client.messages.create({
-                        body: `Baba Homs: New message from ${sender.name} (${sender.phone}). Message: ${content.substring(0, 60)}${content.length > 60 ? '...' : ''}`,
-                        from: process.env.TWILIO_PHONE_NUMBER,
-                        to: receiver.phone
-                    });
-                    console.log(`SMS alert sent to admin: ${receiver.name}`);
-                }
+                const { sendSMS } = require("../utils/twilio");
+                const smsBody = `Baba Homs: New message from ${sender.name} (${sender.phone}). Message: ${content.substring(0, 60)}${content.length > 60 ? '...' : ''}`;
+                await sendSMS(receiver.phone, smsBody);
+                console.log(`SMS alert sent to admin: ${receiver.name}`);
             } catch (smsErr) {
-                console.error("SMS notification failed:", smsErr.message);
+                console.error("SMS notification skipped or failed:", smsErr.message);
             }
         }
 
@@ -152,12 +146,12 @@ router.get("/conversation/:propertyId/:otherUserId", auth, async (req, res) => {
                 {
                     model: User,
                     as: 'sender',
-                    attributes: isCompany ? ['id', 'name', 'role', 'phone', 'profilePicture'] : ['id', 'name', 'role', 'profilePicture']
+                    attributes: isCompany ? ['id', 'name', 'role', 'phone', 'profilePicture', 'lastLogin'] : ['id', 'name', 'role', 'profilePicture', 'lastLogin']
                 },
                 {
                     model: User,
                     as: 'receiver',
-                    attributes: isCompany ? ['id', 'name', 'role', 'phone', 'profilePicture'] : ['id', 'name', 'role', 'profilePicture']
+                    attributes: isCompany ? ['id', 'name', 'role', 'phone', 'profilePicture', 'lastLogin'] : ['id', 'name', 'role', 'profilePicture', 'lastLogin']
                 }
             ],
             order: [["createdAt", "ASC"]],
@@ -207,8 +201,8 @@ router.get("/conversations", auth, async (req, res) => {
             if (!seen.has(key)) {
                 seen.add(key);
 
-                const sender = await User.findByPk(msg.senderId, { attributes: ["id", "name", "role", "phone", "email", "profilePicture"] });
-                const receiver = await User.findByPk(msg.receiverId, { attributes: ["id", "name", "role", "phone", "email", "profilePicture"] });
+                const sender = await User.findByPk(msg.senderId, { attributes: ["id", "name", "role", "phone", "email", "profilePicture", "lastLogin"] });
+                const receiver = await User.findByPk(msg.receiverId, { attributes: ["id", "name", "role", "phone", "email", "profilePicture", "lastLogin"] });
 
                 conversations.push({
                     lastMessage: msg,

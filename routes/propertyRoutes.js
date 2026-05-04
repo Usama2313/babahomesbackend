@@ -70,6 +70,7 @@ router.get("/", async (req, res) => {
             order: [["createdAt", "DESC"]],
             offset,
             limit: limitNumber,
+            attributes: { exclude: ["gallery"] }, // Exclude heavy base64 images from list view
         });
 
         res.json({
@@ -121,7 +122,7 @@ router.get("/:id", async (req, res) => {
         // Check if this user/IP has viewed this property in the last 24 hours
         const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
         const PropertyView = require("../models/PropertyView");
-        
+
         let viewWhere = {
             propertyId: property.id,
             createdAt: { [Op.gt]: twentyFourHoursAgo }

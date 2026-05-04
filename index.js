@@ -139,12 +139,14 @@ try {
 
     const PORT = process.env.PORT || 5000;
 
-    if (process.env.NODE_ENV !== "production") {
+    if (!process.env.VERCEL) {
         const sequelize = require("./config/database");
         sequelize.sync().then(() => {
             app.listen(PORT, () => {
                 console.log(`Server running on port ${PORT}`);
             });
+        }).catch(err => {
+            console.error("Database connection failed:", err);
         });
     }
 

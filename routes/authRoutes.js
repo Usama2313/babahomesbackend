@@ -469,8 +469,7 @@ router.post("/reset-password", async (req, res) => {
         const user = await User.findByPk(decoded.id);
         if (!user) return res.status(404).json({ message: "User not found." });
 
-        const hashedPassword = await bcrypt.hash(newPassword, 10);
-        await user.update({ password: hashedPassword });
+        await user.update({ password: newPassword });
 
         res.json({ message: "Password has been reset successfully. You can now login." });
     } catch (error) {

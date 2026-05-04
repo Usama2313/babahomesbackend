@@ -417,7 +417,7 @@ router.post("/forgot-password", async (req, res) => {
             html: `
                 <div style="font-family: Arial, sans-serif; padding: 20px; border: 1px solid #eee; border-radius: 10px; max-width: 600px; margin: auto;">
                     <div style="text-align: center; margin-bottom: 20px;">
-                        <img src="https://property-4u.netlify.app/logo.jpeg" alt="Baba Homs Logo" style="width: 100px; height: 100px; border-radius: 50%; object-fit: contain; border: 2px solid #eee;" />
+                        <img src="https://property-4u.netlify.app/logo.jpeg" alt="Logo of Baba Homes" style="width: 100px; height: 100px; border-radius: 50%; object-fit: contain; border: 2px solid #eee;" />
                         <h1 style="color: #1e293b; margin-top: 10px;">Baba Homs</h1>
                     </div>
                     <h2 style="color: #1e293b; border-bottom: 2px solid #ffd400; padding-bottom: 10px;">Password Reset</h2>

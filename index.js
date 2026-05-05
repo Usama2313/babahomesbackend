@@ -62,24 +62,32 @@ try {
     app.get("/api/fix-db", async (req, res) => {
         try {
             const sequelize = require("./config/database");
-            // Try both quoted and unquoted for maximum compatibility
-            try { await sequelize.query('ALTER TABLE properties ADD COLUMN IF NOT EXISTS "possessionStatus" VARCHAR(255);'); } catch(e) {}
-            try { await sequelize.query('ALTER TABLE "properties" ADD COLUMN IF NOT EXISTS "possessionStatus" VARCHAR(255);'); } catch(e) {}
-            try { await sequelize.query('ALTER TABLE "Properties" ADD COLUMN IF NOT EXISTS "possessionStatus" VARCHAR(255);'); } catch(e) {}
-            try { await sequelize.query('ALTER TABLE properties ADD COLUMN "possessionStatus" VARCHAR(255);'); } catch(e) {}
+            const { DataTypes } = require("sequelize");
+            const queryInterface = sequelize.getQueryInterface();
             
-            await sequelize.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS "isBlocked" BOOLEAN DEFAULT false;');
-            await sequelize.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS "isVerified" BOOLEAN DEFAULT false;');
-            await sequelize.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS "lastLogin" TIMESTAMP WITH TIME ZONE;');
-            await sequelize.query('ALTER TABLE properties ADD COLUMN IF NOT EXISTS "isApproved" BOOLEAN DEFAULT true;');
-            await sequelize.query('ALTER TABLE properties ADD COLUMN IF NOT EXISTS "isFeatured" BOOLEAN DEFAULT false;');
-            await sequelize.query('ALTER TABLE properties ADD COLUMN IF NOT EXISTS "views" INTEGER DEFAULT 0;');
+            // Attempt to add columns using queryInterface (more reliable across dialects)
+            const addColumnSafe = async (table, col, type) => {
+                try {
+                    await queryInterface.addColumn(table, col, type);
+                } catch (e) {
+                    // Column likely already exists
+                }
+            };
+
+            await addColumnSafe('properties', 'possessionStatus', { type: DataTypes.STRING, allowNull: true });
+            await addColumnSafe('properties', 'isApproved', { type: DataTypes.BOOLEAN, defaultValue: true });
+            await addColumnSafe('properties', 'isFeatured', { type: DataTypes.BOOLEAN, defaultValue: false });
+            await addColumnSafe('properties', 'views', { type: DataTypes.INTEGER, defaultValue: 0 });
             
-            res.json({ status: "ok", message: "Database raw SQL fix applied with multiple attempts!" });
+            await addColumnSafe('users', 'isBlocked', { type: DataTypes.BOOLEAN, defaultValue: false });
+            await addColumnSafe('users', 'isVerified', { type: DataTypes.BOOLEAN, defaultValue: false });
+            await addColumnSafe('users', 'lastLogin', { type: DataTypes.DATE });
+
+            res.json({ status: "ok", message: "Database repair completed using QueryInterface!" });
         } catch (err) {
             res.status(500).json({
                 status: "error",
-                message: "Raw DB fix failed: " + err.message
+                message: "Repair failed: " + err.message
             });
         }
     });

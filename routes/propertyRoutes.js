@@ -32,8 +32,12 @@ router.get("/", async (req, res) => {
             city,
             type,
             propertyType,
+            apartmentType,
             adType,
             category,
+            possessionStatus,
+            minPrice,
+            maxPrice,
             search,
             owner,
             page = 1,
@@ -46,9 +50,33 @@ router.get("/", async (req, res) => {
         if (city) where.city = city;
         if (type) where.type = type;
         if (propertyType) where.propertyType = propertyType;
-        if (adType) where.adType = adType;
+        if (apartmentType) where.apartmentType = apartmentType;
+        if (adType) {
+            if (adType === "Buy") where.adType = { [Op.in]: ["Buy", "Resale"] };
+            else if (adType === "Rental") where.adType = { [Op.in]: ["Rental", "Rent"] };
+            else if (adType === "Projects") {
+                where[Op.or] = [
+                    { adType: "Projects" },
+                    { propertyType: "Land/Plot" }
+                ];
+            } else if (adType === "Commercial") {
+                where[Op.or] = [
+                    { adType: "Commercial" },
+                    { propertyType: "Commercial" }
+                ];
+            } else where.adType = adType;
+        }
         if (category) where.category = category;
+        if (possessionStatus) where.possessionStatus = possessionStatus;
         if (owner) where.owner = owner;
+
+        // Budget / Price Range
+        if (minPrice || maxPrice) {
+            where[Op.or] = [
+                { price: { [Op.between]: [minPrice || 0, maxPrice || 999999999] } },
+                { rentAmount: { [Op.between]: [minPrice || 0, maxPrice || 999999999] } }
+            ];
+        }
 
         if (search) {
             const isPostgres = Property.sequelize.getDialect() === 'postgres';

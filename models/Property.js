@@ -77,7 +77,8 @@ const Property = sequelize.define(
         nonVeg: DataTypes.STRING,
         gatedSecurity: DataTypes.STRING,
         showProperty: DataTypes.STRING,
-        propertyCondition: DataTypes.STRING,
+        possessionStatus: DataTypes.STRING,
+
 
         amenities: {
             type: DataTypes.JSON,

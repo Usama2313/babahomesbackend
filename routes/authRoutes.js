@@ -326,13 +326,21 @@ router.delete("/admin/user/:id", auth, async (req, res) => {
     }
 });
 
-// GET any company/admin user (for fallback/redirect)
+// GET any admin/company user (for fallback/redirect)
 router.get("/company-user", async (req, res) => {
     try {
-        const companyUser = await User.findOne({
-            where: { role: { [Op.or]: ["Company", "Admin"] } },
+        // Find Admin first
+        let companyUser = await User.findOne({
+            where: { role: "Admin" },
             attributes: ["id", "name"]
         });
+        // Fallback to Company if no Admin exists
+        if (!companyUser) {
+            companyUser = await User.findOne({
+                where: { role: "Company" },
+                attributes: ["id", "name"]
+            });
+        }
         res.json(companyUser);
     } catch (error) {
         res.status(500).json({ message: error.message });
@@ -441,9 +449,9 @@ router.post("/forgot-password", async (req, res) => {
             console.log("RESET LINK LOGGED (NO SMTP CREDENTIALS):");
             console.log(resetLink);
             console.log("-----------------------------------------");
-            return res.json({ 
+            return res.json({
                 message: "Password reset link generated (Logged on server). Please configure SMTP credentials to send actual emails.",
-                resetLink: process.env.NODE_ENV === 'development' ? resetLink : undefined 
+                resetLink: process.env.NODE_ENV === 'development' ? resetLink : undefined
             });
         }
 

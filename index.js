@@ -49,9 +49,9 @@ try {
         try {
             const sequelize = require("./config/database");
             const [results] = await sequelize.query(`
-                SELECT column_name, data_type 
+                SELECT table_name, column_name, data_type 
                 FROM information_schema.columns 
-                WHERE table_name = 'properties';
+                WHERE table_name ILIKE 'properties';
             `);
             res.json({ status: "ok", columns: results });
         } catch (err) {
@@ -65,6 +65,7 @@ try {
             // Try both quoted and unquoted for maximum compatibility
             try { await sequelize.query('ALTER TABLE properties ADD COLUMN IF NOT EXISTS "possessionStatus" VARCHAR(255);'); } catch(e) {}
             try { await sequelize.query('ALTER TABLE "properties" ADD COLUMN IF NOT EXISTS "possessionStatus" VARCHAR(255);'); } catch(e) {}
+            try { await sequelize.query('ALTER TABLE "Properties" ADD COLUMN IF NOT EXISTS "possessionStatus" VARCHAR(255);'); } catch(e) {}
             try { await sequelize.query('ALTER TABLE properties ADD COLUMN "possessionStatus" VARCHAR(255);'); } catch(e) {}
             
             await sequelize.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS "isBlocked" BOOLEAN DEFAULT false;');

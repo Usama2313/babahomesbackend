@@ -112,6 +112,12 @@ router.get("/", async (req, res) => {
             totalProperties,
         });
     } catch (error) {
+        if (error.message.includes("possessionStatus")) {
+            return res.status(500).json({ 
+                message: "Database schema mismatch: 'possessionStatus' column is missing. Please visit /api/fix-db and then /api/sync to fix this.",
+                fixUrl: "/api/fix-db"
+            });
+        }
         res.status(500).json({ message: error.message });
     }
 });

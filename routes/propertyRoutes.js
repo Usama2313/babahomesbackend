@@ -208,6 +208,7 @@ router.post("/", auth, async (req, res) => {
 
         const property = await Property.create({
             ...req.body,
+            possessionStatus: req.body.possessionStatus,
             owner: req.user.id,
         });
 
@@ -233,7 +234,10 @@ router.put("/:id", auth, async (req, res) => {
             });
         }
 
-        await property.update(req.body);
+        await property.update({
+            ...req.body,
+            possessionStatus: req.body.possessionStatus
+        });
 
         res.json(property);
     } catch (error) {

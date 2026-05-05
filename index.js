@@ -45,27 +45,36 @@ try {
         }
     });
 
+    app.get("/api/db-info", async (req, res) => {
+        try {
+            const sequelize = require("./config/database");
+            const [results] = await sequelize.query(`
+                SELECT column_name, data_type 
+                FROM information_schema.columns 
+                WHERE table_name = 'properties';
+            `);
+            res.json({ status: "ok", columns: results });
+        } catch (err) {
+            res.status(500).json({ status: "error", message: err.message });
+        }
+    });
+
     app.get("/api/fix-db", async (req, res) => {
         try {
             const sequelize = require("./config/database");
+            // Try both quoted and unquoted for maximum compatibility
+            try { await sequelize.query('ALTER TABLE properties ADD COLUMN IF NOT EXISTS "possessionStatus" VARCHAR(255);'); } catch(e) {}
+            try { await sequelize.query('ALTER TABLE "properties" ADD COLUMN IF NOT EXISTS "possessionStatus" VARCHAR(255);'); } catch(e) {}
+            try { await sequelize.query('ALTER TABLE properties ADD COLUMN "possessionStatus" VARCHAR(255);'); } catch(e) {}
+            
             await sequelize.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS "isBlocked" BOOLEAN DEFAULT false;');
             await sequelize.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS "isVerified" BOOLEAN DEFAULT false;');
             await sequelize.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS "lastLogin" TIMESTAMP WITH TIME ZONE;');
             await sequelize.query('ALTER TABLE properties ADD COLUMN IF NOT EXISTS "isApproved" BOOLEAN DEFAULT true;');
             await sequelize.query('ALTER TABLE properties ADD COLUMN IF NOT EXISTS "isFeatured" BOOLEAN DEFAULT false;');
             await sequelize.query('ALTER TABLE properties ADD COLUMN IF NOT EXISTS "views" INTEGER DEFAULT 0;');
-            await sequelize.query('ALTER TABLE "properties" ADD COLUMN IF NOT EXISTS "possessionStatus" VARCHAR(255);');
-            await sequelize.query(`
-                CREATE TABLE IF NOT EXISTS "property_views" (
-                    "id" SERIAL PRIMARY KEY,
-                    "propertyId" INTEGER NOT NULL,
-                    "userId" INTEGER,
-                    "ipAddress" VARCHAR(255),
-                    "createdAt" TIMESTAMP WITH TIME ZONE NOT NULL,
-                    "updatedAt" TIMESTAMP WITH TIME ZONE NOT NULL
-                );
-            `);
-            res.json({ status: "ok", message: "Database raw SQL fix applied successfully!" });
+            
+            res.json({ status: "ok", message: "Database raw SQL fix applied with multiple attempts!" });
         } catch (err) {
             res.status(500).json({
                 status: "error",

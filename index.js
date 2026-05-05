@@ -54,7 +54,7 @@ try {
             await sequelize.query('ALTER TABLE properties ADD COLUMN IF NOT EXISTS "isApproved" BOOLEAN DEFAULT true;');
             await sequelize.query('ALTER TABLE properties ADD COLUMN IF NOT EXISTS "isFeatured" BOOLEAN DEFAULT false;');
             await sequelize.query('ALTER TABLE properties ADD COLUMN IF NOT EXISTS "views" INTEGER DEFAULT 0;');
-            await sequelize.query('ALTER TABLE properties ADD COLUMN IF NOT EXISTS "possessionStatus" VARCHAR(255);');
+            await sequelize.query('ALTER TABLE "properties" ADD COLUMN IF NOT EXISTS "possessionStatus" VARCHAR(255);');
             await sequelize.query(`
                 CREATE TABLE IF NOT EXISTS "property_views" (
                     "id" SERIAL PRIMARY KEY,

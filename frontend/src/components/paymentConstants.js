@@ -1,0 +1,2 @@
+export const IBAN_INDIA = "IN00 1234 5678 9012 3456 78";
+export const IBAN_GCC = "AE00 1234 5678 9012 3456 78";

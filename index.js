@@ -5,17 +5,21 @@ try {
     require("dotenv").config();
 
     const app = express();
-const path = require('path');
-const fs = require('fs');
+    const path = require('path');
+    const fs = require('fs');
     const uploadsPath = path.join(__dirname, 'uploads');
     if (!fs.existsSync(uploadsPath)) {
-      fs.mkdirSync(uploadsPath);
+        try {
+            fs.mkdirSync(uploadsPath);
+        } catch (e) {
+            console.warn('Could not create uploads directory on Vercel read-only filesystem');
+        }
     }
     app.use('/uploads', express.static(uploadsPath));
-app.use(cors({
-    origin: "*",
-    credentials: true
-}));
+    app.use(cors({
+        origin: "*",
+        credentials: true
+    }));
 
     app.use(express.json({ limit: "50mb" }));
     app.use(express.urlencoded({ limit: "50mb", extended: true }));
@@ -196,7 +200,11 @@ app.use(cors({
 
     const uploadsPath = path.join(__dirname, 'uploads');
     if (!fs.existsSync(uploadsPath)) {
-      fs.mkdirSync(uploadsPath);
+        try {
+            fs.mkdirSync(uploadsPath);
+        } catch (e) {
+            console.warn('Could not create uploads directory on Vercel read-only filesystem');
+        }
     }
     app.use('/uploads', express.static(uploadsPath));
     app.all("*", (req, res) => {

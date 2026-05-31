@@ -89,7 +89,10 @@ app.use(cors({
             await addColumnSafe('properties', 'isTrial', { type: DataTypes.BOOLEAN, defaultValue: false });
             await addColumnSafe('properties', 'trialExpiresAt', { type: DataTypes.DATE, allowNull: true });
             await addColumnSafe('properties', 'isHidden', { type: DataTypes.BOOLEAN, defaultValue: false });
-            await queryInterface.changeColumn('properties', 'generatedVideo', { type: DataTypes.TEXT, allowNull: true });
+            await addColumnSafe('properties', 'generatedVideo', { type: DataTypes.TEXT, allowNull: true });
+            await addColumnSafe('properties', 'shopName', { type: DataTypes.STRING, allowNull: true });
+            await addColumnSafe('properties', 'shopType', { type: DataTypes.STRING, allowNull: true });
+            await addColumnSafe('properties', 'shopFloorArea', { type: DataTypes.FLOAT, allowNull: true });
 
             await addColumnSafe('users', 'isBlocked', { type: DataTypes.BOOLEAN, defaultValue: false });
             await addColumnSafe('users', 'isVerified', { type: DataTypes.BOOLEAN, defaultValue: false });

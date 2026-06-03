@@ -44,82 +44,82 @@ const getAmenityIcon = (name) => {
   return map[name] || <CheckCircle size={20} />;
 };
 
-const handleShare = async () => {
-  const baseUrl = window.location.href;
-  const title = property?.title || '';
-  const description = property?.description || '';
-  const address = `${property?.locality || ''}, ${property?.city || ''}, ${property?.country || ''}`;
-const toAbsolute = (url) => url.startsWith('http') ? url : `${window.location.origin}${url.startsWith('/') ? '' : '/'}${url}`;
-  let galleryArr = property?.gallery;
-  try { if (typeof galleryArr === 'string') galleryArr = JSON.parse(galleryArr); } catch (e) { galleryArr = []; }
-  const imageLinks = (Array.isArray(galleryArr) ? galleryArr.filter(i => typeof i === 'string' && !i.startsWith('data:video')) : []).slice(0,5).map(toAbsolute);
-  const videoLinks = (Array.isArray(galleryArr) ? galleryArr.filter(i => typeof i === 'string' && i.startsWith('data:video')) : []).map(toAbsolute);
-  if (property?.generatedVideo) {
-    videoLinks.unshift(toAbsolute(property.generatedVideo));
-  }
-  const lines = [];
-  lines.push(`${title} - ${description}`);
-  if (address) lines.push(`Location: ${address}`);
-  lines.push(`Check it out! ${baseUrl}`);
-  if (imageLinks.length) lines.push('Images:', ...imageLinks);
-  if (videoLinks.length) lines.push('Videos:', ...videoLinks);
-  const caption = lines.join('\n');
-  const apiKey = import.meta.env.VITE_BUFFER_API_KEY;
-  const channelId = import.meta.env.VITE_BUFFER_CHANNEL_ID;
-  if (apiKey && channelId) {
-    try {
-      const graphqlQuery = `
-        mutation CreatePost($input: CreatePostInput!) {
-          createPost(input: $input) {
-            ... on PostActionSuccess {
-              post { id }
-            }
-            ... on MutationError { message }
-          }
-        }`;
-      const assets = [
-        ...imageLinks.map(url => ({ image: { url } })),
-        ...videoLinks.map(url => ({ video: { url } })),
-      ];
-      const response = await fetch('https://publish.buffer.com/graphql', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify({
-          query: graphqlQuery,
-          variables: {
-            input: {
-              text: caption,
-              channelId,
-              assets,
-            },
-          },
-        }),
-      });
-      const result = await response.json();
-      if (result?.errors) {
-        throw new Error(result.errors[0]?.message || 'Buffer API Error');
-      }
-      const postId = result?.data?.createPost?.post?.id;
-      if (postId) {
-        window.open(`https://publish.buffer.com/updates/${postId}`, '_blank');
-        return;
-      }
-    } catch (err) {
-      console.error('Buffer request failed', err);
-      toast.error('Sharing via Buffer failed. Using standard share method.');
-    }
-  }
-  // Fallback
-  window.open(`https://publish.buffer.com/compose?text=${encodeURIComponent(caption)}`, '_blank');
-};
-
 const PropertyDetails = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const [property, setProperty] = useState(null);
+
+  // Moved handleShare after property state declaration to avoid ReferenceError
+  const handleShare = async () => {
+    const baseUrl = window.location.href;
+    const title = property?.title || '';
+    const description = property?.description || '';
+    const address = `${property?.locality || ''}, ${property?.city || ''}, ${property?.country || ''}`;
+    const toAbsolute = (url) => url.startsWith('http') ? url : `${window.location.origin}${url.startsWith('/') ? '' : '/'}${url}`;
+    let galleryArr = property?.gallery;
+    try { if (typeof galleryArr === 'string') galleryArr = JSON.parse(galleryArr); } catch (e) { galleryArr = []; }
+    const imageLinks = (Array.isArray(galleryArr) ? galleryArr.filter(i => typeof i === 'string' && !i.startsWith('data:video')) : []).slice(0,5).map(toAbsolute);
+    const videoLinks = (Array.isArray(galleryArr) ? galleryArr.filter(i => typeof i === 'string' && i.startsWith('data:video')) : []).map(toAbsolute);
+    if (property?.generatedVideo) { videoLinks.unshift(toAbsolute(property.generatedVideo)); }
+    const lines = [];
+    lines.push(`${title} - ${description}`);
+    if (address) lines.push(`Location: ${address}`);
+    lines.push(`Check it out! ${baseUrl}`);
+    if (imageLinks.length) lines.push('Images:', ...imageLinks);
+    if (videoLinks.length) lines.push('Videos:', ...videoLinks);
+    const caption = lines.join('\n');
+    const apiKey = import.meta.env.VITE_BUFFER_API_KEY;
+    const channelId = import.meta.env.VITE_BUFFER_CHANNEL_ID;
+    if (apiKey && channelId) {
+      try {
+        const graphqlQuery = `
+          mutation CreatePost($input: CreatePostInput!) {
+            createPost(input: $input) {
+              ... on PostActionSuccess {
+                post { id }
+              }
+              ... on MutationError { message }
+            }
+          }`;
+        const assets = [
+          ...imageLinks.map(url => ({ image: { url } })),
+          ...videoLinks.map(url => ({ video: { url } })),
+        ];
+        const response = await fetch('https://publish.buffer.com/graphql', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${apiKey}`,
+          },
+          body: JSON.stringify({
+            query: graphqlQuery,
+            variables: {
+              input: {
+                text: caption,
+                channelId,
+                assets,
+              },
+            },
+          }),
+        });
+        const result = await response.json();
+        if (result?.errors) {
+          throw new Error(result.errors[0]?.message || 'Buffer API Error');
+        }
+        const postId = result?.data?.createPost?.post?.id;
+        if (postId) {
+          window.open(`https://publish.buffer.com/updates/${postId}`, '_blank');
+          return;
+        }
+      } catch (err) {
+        console.error('Buffer request failed', err);
+        toast.error('Sharing via Buffer failed. Using standard share method.');
+      }
+    }
+    // Fallback
+    window.open(`https://publish.buffer.com/compose?text=${encodeURIComponent(caption)}`, '_blank');
+  };
+
   const [loading, setLoading] = useState(true);
 
   const currentUser = JSON.parse(localStorage.getItem("babaUser") || "{}");

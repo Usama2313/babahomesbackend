@@ -67,7 +67,6 @@ const PostProperty = () => {
   };
 
   const [form, setForm] = useState({
-    title: "",
     budget: "",
     possessionStatus: "",
     currency: "₹",
@@ -106,9 +105,7 @@ const PostProperty = () => {
     customLogo: null,
     schedule: {
       availableDays: [],
-      timeSlot: "",
-      startTime: "",
-      endTime: ""
+      timeSlot: ""
     }
   });
 
@@ -214,7 +211,7 @@ const PostProperty = () => {
     try {
       const formData = new FormData();
       formData.append('file', file);
-    const res = await API.post('/api/upload-media', formData, {
+      const res = await API.post('/properties/upload-media', formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
       return res.data.url;

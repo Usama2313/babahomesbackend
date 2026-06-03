@@ -15,7 +15,8 @@ const storage = multer.diskStorage({
   },
 });
 
-const upload = multer({ storage });
+// Export multer instance as uploadMediaFile for route middleware
+const uploadMediaFile = multer({ storage });
 
 // Handler expects a multipart/form-data with field 'file'
 const uploadMedia = async (req, res) => {
@@ -31,4 +32,4 @@ const uploadMedia = async (req, res) => {
   }
 };
 
-module.exports = { upload: upload, uploadMedia };
+module.exports = { uploadMediaFile, uploadMedia };

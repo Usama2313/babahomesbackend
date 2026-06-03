@@ -5,8 +5,9 @@ try {
     require("dotenv").config();
 
     const app = express();
-    const path = require('path');
+    const { uploadMediaFile, uploadMedia } = require("./controllers/uploadMedia");
     const fs = require('fs');
+const path = require('path');
     const uploadsPath = path.join(__dirname, 'uploads');
     if (!fs.existsSync(uploadsPath)) {
         try {
@@ -170,13 +171,6 @@ try {
     });
 
     // Load other routes
-    // Direct media upload endpoint (outside property routes)
-    const { uploadMediaFile, uploadMedia } = require('./middleware/upload');
-    app.post('/api/upload-media', uploadMediaFile.single('file'), (req, res) => {
-        console.log('Upload route hit');
-        uploadMedia(req, res);
-    });
-
     app.use("/api/properties", require("./routes/propertyRoutes"));
     app.use("/api/auth", require("./routes/authRoutes"));
     app.use("/api/chat", require("./routes/chatRoutes"));
@@ -204,9 +198,7 @@ try {
     const express = require("express");
     const app = express();
 
-    // Ensure required modules are available in this scope (catch block may lack them)
-    const path = require('path');
-    const fs = require('fs');
+
     const uploadsPath = path.join(__dirname, 'uploads');
     if (!fs.existsSync(uploadsPath)) {
         try {

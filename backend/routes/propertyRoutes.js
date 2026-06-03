@@ -5,7 +5,7 @@ const { Op } = require("sequelize");
 const Property = require("../models/Property");
 const User = require("../models/User");
 const { upload } = require("../controllers/uploadLogo");
-const { upload: uploadMediaFile, uploadMedia } = require("../controllers/uploadMedia");
+const { uploadMediaFile, uploadMedia } = require("../controllers/uploadMedia");
 
 const router = express.Router();
 

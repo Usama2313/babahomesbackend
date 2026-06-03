@@ -171,8 +171,11 @@ try {
 
     // Load other routes
     // Direct media upload endpoint (outside property routes)
-const { uploadMediaFile, uploadMedia } = require('./middleware/upload');
-    app.post('/api/upload-media', uploadMediaFile.single('file'), uploadMedia);
+    const { uploadMediaFile, uploadMedia } = require('./middleware/upload');
+    app.post('/api/upload-media', uploadMediaFile.single('file'), (req, res) => {
+        console.log('Upload route hit');
+        uploadMedia(req, res);
+    });
 
     app.use("/api/properties", require("./routes/propertyRoutes"));
     app.use("/api/auth", require("./routes/authRoutes"));

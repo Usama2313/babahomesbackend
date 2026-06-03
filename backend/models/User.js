@@ -66,6 +66,18 @@ const User = sequelize.define(
             type: DataTypes.INTEGER,
             defaultValue: 1,
         },
+        trialPostCount: {
+            type: DataTypes.INTEGER,
+            defaultValue: 0,
+        },
+        trialStartDate: {
+            type: DataTypes.DATE,
+            allowNull: true,
+        },
+        phillsBalance: {
+            type: DataTypes.INTEGER,
+            defaultValue: 0,
+        },
     },
     {
         tableName: "users",

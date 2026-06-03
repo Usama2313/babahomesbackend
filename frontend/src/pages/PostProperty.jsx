@@ -207,60 +207,26 @@ const PostProperty = () => {
     });
   };
 
-  // Function to convert uploaded images into a short video using MediaRecorder
-const convertImagesToVideo = async () => {
-    // Gather image files from the gallery state
-    const imageFiles = form.gallery.filter(f => f instanceof File && f.type.startsWith('image/'));
-    if (imageFiles.length === 0) {
-      toast.error('No images to convert.');
-      return;
-    }
+  const uploadMedia = async (file) => {
     try {
-      // Helper to load an image file and return an HTMLImageElement
-      const loadImg = file => new Promise(resolve => {
-        const img = new Image();
-        img.onload = () => resolve(img);
-        img.src = URL.createObjectURL(file);
+      const formData = new FormData();
+      formData.append('file', file);
+      const res = await API.post('/upload-media', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
       });
-
-      const firstImg = await loadImg(imageFiles[0]);
-      const canvas = document.createElement('canvas');
-      canvas.width = firstImg.width;
-      canvas.height = firstImg.height;
-      const ctx = canvas.getContext('2d');
-      const stream = canvas.captureStream(30); // 30 fps for smoother video
-      const recorder = new MediaRecorder(stream, { mimeType: 'video/webm' });
-      const chunks = [];
-      recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
-      recorder.start();
-
-      // Draw each image for 1 second
-      for (const file of imageFiles) {
-        const img = await loadImg(file);
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        await new Promise(r => setTimeout(r, 1000)); // 1 second per frame
-      }
-
-      recorder.stop();
-      await new Promise(r => recorder.onstop = r);
-      const videoBlob = new Blob(chunks, { type: 'video/webm' });
-
-      // Add video blob to gallery and create a preview URL
-      setForm(prev => ({ ...prev, gallery: [...prev.gallery, videoBlob] }));
-      const videoUrl = URL.createObjectURL(videoBlob);
-      setActiveMedia(videoUrl);
-      toast.success('Video created from images.');
+      return res.data.url;
     } catch (err) {
-      console.error(err);
-      toast.error('Failed to convert images to video.');
+      console.error("Upload failed", err);
+      toast.error('Failed to upload media.');
+      throw err;
     }
   };
 
   const handleFileUpload = async (e) => {
     const files = Array.from(e.target.files);
-    const processedFiles = [];
+    const uploadedUrls = [];
 
-    let currentVideoCount = form.gallery.filter(f => f instanceof File && f.type.startsWith('video/')).length;
+    let currentVideoCount = form.gallery.filter(f => typeof f === 'string' && f.includes('video')).length;
     let newVideoCount = 0;
 
     for (let file of files) {
@@ -287,7 +253,8 @@ const convertImagesToVideo = async () => {
           toast.error(`${file.name} is vertical. Please capture videos horizontally.`);
           continue;
         }
-        processedFiles.push(file);
+        const url = await uploadMedia(file);
+        uploadedUrls.push(url);
         newVideoCount++;
       } else if (file.type.startsWith('image/')) {
         const isHorizontal = await new Promise((resolve) => {
@@ -304,12 +271,13 @@ const convertImagesToVideo = async () => {
           continue;
         }
         const compressed = await compressImage(file);
-        processedFiles.push(compressed);
+        const url = await uploadMedia(compressed);
+        uploadedUrls.push(url);
       }
     }
 
-    if (processedFiles.length > 0) {
-      setForm((prev) => ({ ...prev, gallery: [...prev.gallery, ...processedFiles] }));
+    if (uploadedUrls.length > 0) {
+      setForm((prev) => ({ ...prev, gallery: [...prev.gallery, ...uploadedUrls] }));
     }
     e.target.value = '';
   };
@@ -368,16 +336,16 @@ const convertImagesToVideo = async () => {
     }
 
     if (step === 6) {
-        // Availability Time is required
-        if (!form.schedule.startTime || !form.schedule.endTime) {
-          toast.error('Please select start and end time for availability.');
-          return;
-        }
-        if (form.schedule.endTime <= form.schedule.startTime) {
-          toast.error('End time must be after start time.');
-          return;
-        }
+      // Availability Time is required
+      if (!form.schedule.startTime || !form.schedule.endTime) {
+        toast.error('Please select start and end time for availability.');
+        return;
       }
+      if (form.schedule.endTime <= form.schedule.startTime) {
+        toast.error('End time must be after start time.');
+        return;
+      }
+    }
 
     if (step < 6) setStep(step + 1);
     else submitProperty();
@@ -518,7 +486,7 @@ Here is the transfer receipt screenshot. Please verify it, increase my listing l
         setLoading(false);
         return;
       }
-      
+
       let customLogoUrl = null;
       let createdLogoUrl = false;
       if (form.useWatermark !== false) {
@@ -640,6 +608,7 @@ Here is the transfer receipt screenshot. Please verify it, increase my listing l
                   <li><strong>10 Properties:</strong> 5 BHD</li>
                   <li><strong>50 Properties:</strong> 20 BHD</li>
                 </ul>
+                <p style={{ marginTop: '8px' }}>After payment, you will be able to post the property and it will be visible.</p>
               </div>
             </div>
             <div className="featureList">
@@ -1263,14 +1232,6 @@ Here is the transfer receipt screenshot. Please verify it, increase my listing l
                   </div> {/* close frontImageUpload */}
                 </div> {/* end of frontImageSection */}
 
-                {/* Convert to Video Button */}
-                <button
-                  className="convertBtn"
-                  style={{ marginTop: '10px', padding: '0.6rem 1.5rem', background: '#3b82f6', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer' }}
-                  onClick={convertImagesToVideo}
-                >
-                  Convert Images to Video
-                </button>
 
                 <div className="photosSectionBlock">
                   <div className="photosSectionHeader">

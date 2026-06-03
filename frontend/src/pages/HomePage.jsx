@@ -32,6 +32,7 @@ const HomePage = () => {
   // Add possessionStatus, propertyType and budget states
   const [possessionStatus, setPossessionStatus] = useState("");
   const [propertyType, setPropertyType] = useState("");
+  const [shareLoading, setShareLoading] = useState(false);
   const [budget, setBudget] = useState("");
   const [properties, setProperties] = useState(fallbackProperties);
   const [loading, setLoading] = useState(false);
@@ -450,7 +451,7 @@ const HomePage = () => {
                       : (Array.isArray(galleryArr) && galleryArr.length > 0 ? galleryArr[0] : "https://via.placeholder.com/600x400?text=Baba+Homs+Property");
 
                     if (typeof mediaSrc === 'string' && mediaSrc.startsWith('data:video')) {
-                      return <video src={mediaSrc} className="card-media" controls={false} autoPlay muted loop />;
+                      return <video src={mediaSrc} className="card-media" controls autoPlay muted loop />;
                     }
                     return <img src={mediaSrc} alt={property.title || 'Property'} className="card-media" />;
                   })()}
@@ -479,39 +480,86 @@ const HomePage = () => {
                     <div style={{ display: 'flex', gap: '8px' }}>
                       <button
                         className="card-share-btn"
+                        disabled={shareLoading}
                         onClick={async (e) => {
                           e.stopPropagation();
-                          const url = `${window.location.origin}/property/${property.id || property._id}`;
-                          const propertyTitle = property.title || `${property.bhkType || ''} ${property.apartmentType || property.type || 'Property'} in ${property.locality || property.city}`;
-                          const text = `Check out this property on Baba Homs: ${propertyTitle}`;
-
-                          if (navigator.share) {
-                            try {
-                              await navigator.share({ title: property.title || 'Baba Homs Property', text, url });
-                              return;
-                            } catch (err) {
-                              if (err.name !== 'AbortError') console.error(err);
-                            }
-                          }
-
-                          // Fallback for desktop or failed share
-                          const shareMenu = [
-                            { name: 'WhatsApp', url: `https://wa.me/?text=${encodeURIComponent(text + " " + url)}` },
-                            { name: 'Email', url: `mailto:?subject=${encodeURIComponent(property.title)}&body=${encodeURIComponent(text + " " + url)}` }
-                          ];
-
-                          // Try to copy to clipboard as final fallback
+                          setShareLoading(true);
                           try {
-                            await navigator.clipboard.writeText(url);
-                            toast.success("Link copied to clipboard!");
-                          } catch (err) {
-                            window.open(shareMenu[0].url, '_blank');
+                            const baseUrl = `${window.location.origin}/property/${property.id || property._id}`;
+                            const title = property.title || `${property.bhkType || ''} ${property.apartmentType || property.type || 'Property'} in ${property.locality || property.city}`;
+                            // Parse gallery JSON if needed
+                            let galleryArr = property.gallery;
+                            try {
+                              if (typeof galleryArr === 'string') galleryArr = JSON.parse(galleryArr);
+                            } catch (e) {
+                              galleryArr = [];
+                            }
+                            const imageLinks = (Array.isArray(galleryArr) ? galleryArr.filter(i => typeof i === 'string' && !i.startsWith('data:video')) : []).slice(0, 5);
+                            const videoLinks = (Array.isArray(galleryArr) ? galleryArr.filter(i => typeof i === 'string' && i.startsWith('data:video')) : []);
+                            const lines = [];
+                            lines.push(`${title} - Check it out! ${baseUrl}`);
+                            if (imageLinks.length) lines.push('Images:', ...imageLinks);
+                            if (videoLinks.length) lines.push('Videos:', ...videoLinks);
+                            const caption = lines.join('\n');
+                            const apiKey = import.meta.env.VITE_BUFFER_API_KEY;
+                            if (apiKey) {
+                              try {
+                                const graphqlQuery = `mutation CreatePost($input: CreatePostInput!) {
+                                  createPost(input: $input) {
+                                    ... on PostActionSuccess {
+                                      post { id }
+                                    }
+                                    ... on MutationError { message }
+                                  }
+                                }`;
+                                const assets = [
+                                  ...imageLinks.map(url => ({ image: { url } })),
+                                  ...videoLinks.map(url => ({ video: { url } })),
+                                ];
+                                const response = await fetch('https://publish.buffer.com/graphql', {
+                                  method: 'POST',
+                                  headers: {
+                                    'Content-Type': 'application/json',
+                                    Authorization: `Bearer ${apiKey}`,
+                                  },
+                                  body: JSON.stringify({
+                                    query: graphqlQuery,
+                                    variables: {
+                                      input: {
+                                        text: caption,
+                                        channelId: import.meta.env.VITE_BUFFER_CHANNEL_ID,
+                                        assets,
+                                      },
+                                    },
+                                  }),
+                                });
+                                const result = await response.json();
+                                const postId = result?.data?.createPost?.post?.id;
+                                if (postId) {
+                                  window.open(`https://publish.buffer.com/updates/${postId}`, '_blank');
+                                  toast.success('Successfully shared to Buffer!');
+                                } else {
+                                  console.error('Buffer GraphQL error', result);
+                                  toast.error('Failed to share via Buffer API.');
+                                }
+                              } catch (err) {
+                                console.error('Buffer request failed', err);
+                                toast.error('Error during Buffer request.');
+                              }
+                            } else {
+                              // Fallback
+                              window.open(`https://publish.buffer.com/compose?text=${encodeURIComponent(caption)}`, '_blank');
+                              toast('Opened Buffer compose window.');
+                            }
+                          } finally {
+                            setShareLoading(false);
                           }
                         }}
                         title="Share Property"
-                        style={{ background: '#f1f5f9', border: 'none', padding: '8px', borderRadius: '8px', cursor: 'pointer', color: '#64748b', display: 'flex', alignItems: 'center', gap: '5px' }}
+                        style={{ background: '#f1f5f9', border: 'none', padding: '8px', borderRadius: '8px', cursor: shareLoading ? 'not-allowed' : 'pointer', color: '#64748b', display: 'flex', alignItems: 'center', gap: '5px' }}
                       >
                         <Share2 size={16} />
+                        {shareLoading && <span style={{ marginLeft: '5px' }}>Sharing...</span>}
                       </button>
                       <button className="card-view-btn" onClick={() => navigate(`/property/${property.id || property._id}`)}>
                         Details

@@ -31,7 +31,35 @@ const SocialIcons = () => (
         `<svg fill="#${icon.hex}" width="24" height="24"`
       );
       return (
-        <a key={name} href="#" aria-label={name} title={name}>
+        <a key={name} href={(() => {
+            switch (name) {
+              case 'Facebook':
+                return 'https://www.facebook.com/profile.php?id=61590762711518';
+              case 'WhatsApp':
+                return 'https://wa.me/97332271249';
+              case 'Instagram':
+                return 'https://www.instagram.com/';
+              case 'Twitter':
+                return 'https://twitter.com/';
+              case 'YouTube':
+                return 'https://www.youtube.com/';
+              case 'LinkedIn':
+                return 'https://www.linkedin.com/';
+              case 'TikTok':
+                return 'https://www.tiktok.com/';
+              case 'Messenger':
+                return 'https://m.me/';
+              case 'Snapchat':
+                return 'https://www.snapchat.com/add/';
+              default:
+                return '#';
+            }
+          })()}
+            aria-label={name}
+            title={name}
+            target="_blank"
+            rel="noreferrer"
+          >
           <span
             className="social-icon-3d"
             dangerouslySetInnerHTML={{ __html: svg }}

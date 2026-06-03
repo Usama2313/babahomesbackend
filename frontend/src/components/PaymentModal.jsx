@@ -3,6 +3,8 @@ import ReactDOM from 'react-dom';
 import { paymentConstants } from '../utils/paymentConstants';
 import { pricingConstants } from '../utils/pricingConstants';
 import './PaymentModal.css';
+import { X, Loader2, ArrowRight, Award, ShieldCheck, MessageSquare, DollarSign } from 'lucide-react';
+import QRcodeImg from "../assets/QRcode.jpeg";
 
 /**
  * PaymentModal
@@ -13,16 +15,18 @@ import './PaymentModal.css';
  *   onPayNow: function
  *   onFreeTrial: function
  */
-import { Loader2, X, MessageSquare, Award, ArrowRight, ShieldCheck, DollarSign } from 'lucide-react';
 
-const PaymentModal = ({ isOpen, onClose, region = 'india', onPayNow, onFreeTrial, trialCount = 0 }) => {
+
+const PaymentModal = ({ isOpen, onClose, region = 'india', onPayNow, onFreeTrial, trialCount = 0, userName = '', userPhone = '', propertyId = '', propertyTitle = '' }) => {
   const [selectedTier, setSelectedTier] = useState('one'); // 'one', 'ten', 'fifty', 'custom'
   const [customQty, setCustomQty] = useState(2);
   const [price, setPrice] = useState('400 Phills');
   const [loading, setLoading] = useState(true);
   const [freeTrialLoading, setFreeTrialLoading] = useState(false);
-const [whatsappLoading, setWhatsappLoading] = useState(false);
-
+  const [whatsappLoading, setWhatsappLoading] = useState(false);
+  const [paymentSubmitted, setPaymentSubmitted] = useState(false);
+  const [paymentConfirmed, setPaymentConfirmed] = useState(false);
+  const [paymentDetails, setPaymentDetails] = useState(null);
 
   // Helper to calculate price
   const calculatePrice = (tier, qty) => {
@@ -59,25 +63,12 @@ const [whatsappLoading, setWhatsappLoading] = useState(false);
 
   const iban = region === 'gcc' ? paymentConstants.IBAN_GCC : paymentConstants.IBAN_INDIA;
 
-  const handleWhatsAppSubmit = async () => {
-  setWhatsappLoading(true);
-  try {
-    const planLabel = (() => {
-      if (selectedTier === 'one') return '1 Property Plan';
-      if (selectedTier === 'ten') return '10 Properties Plan';
-      if (selectedTier === 'fifty') return '50 Properties Plan';
-      return `Custom Plan (${customQty} Properties)`;
-    })();
-    await onPayNow({
-      tier: selectedTier,
-      quantity: selectedTier === 'custom' ? customQty : (selectedTier === 'one' ? 1 : selectedTier === 'ten' ? 10 : 50),
-      price: price,
-      label: planLabel
-    });
-  } finally {
-    setWhatsappLoading(false);
-  }
-};
+  // Previously handled payment submission; now we directly open WhatsApp for payment.
+  const handleWhatsAppSubmit = () => {
+    // Open WhatsApp with a prefilled message for payment.
+    const message = encodeURIComponent('I would like to pay for the selected plan.');
+    window.open(`https://wa.me/97332271249?text=${message}`, '_blank');
+  };
 
 
   return ReactDOM.createPortal(
@@ -104,21 +95,9 @@ const [whatsappLoading, setWhatsappLoading] = useState(false);
               Please transfer the amount to the following IBAN manually:
             </p>
 
-            <div className="iban-card-box">
-              <div className="iban-header">
-                <ShieldCheck size={16} className="shield-icon" />
-                <span>OFFICIAL BABA HOMS IBAN</span>
-              </div>
-              <code className="iban-number">{iban}</code>
-            </div>
-
-            <div className="whatsapp-instruction-box">
-              <MessageSquare className="wa-icon" size={20} />
-              <div className="wa-text-content">
-                <h4>Payment Screenshot Verification</h4>
-                <p>After completing the transfer, please send the payment screenshot on WhatsApp to activate your listing:</p>
-                <a href={`https://wa.me/97332271249`} target="_blank" rel="noreferrer" className="wa-number-link">+973 32271249</a>
-              </div>
+            <div className="qr-code-box" style={{ textAlign: 'center', marginTop: '20px' }}>
+              <h3>Payment QR Code</h3>
+              <img src={QRcodeImg} alt="Payment QR Code" style={{ width: '200px', margin: '10px auto' }} />
             </div>
 
             <div className="plan-selection-container">
@@ -158,18 +137,37 @@ const [whatsappLoading, setWhatsappLoading] = useState(false);
                 <DollarSign size={20} className="dollar-icon" />
                 <span className="price-value">{price}</span>
               </div>
+              <button 
+                className="confirm-payment-btn" 
+                onClick={() => setPaymentConfirmed(true)}
+                style={{ marginTop: '10px', width: '100%' }}
+              >
+                Confirm Payment Details
+              </button>
+              {paymentConfirmed && (
+                <div className="confirmed-details" style={{ marginTop: '15px', padding: '10px', background: '#e6fffa', borderRadius: '4px' }}>
+                  <p><strong>Payment Status:</strong> Confirmed</p>
+                  <p><strong>Plan:</strong> {selectedTier} ({price})</p>
+                  <p><strong>Name:</strong> {userName}</p>
+                  <p><strong>Phone:</strong> {userPhone}</p>
+                  <p><strong>Property ID:</strong> {propertyId}</p>
+                  <p><strong>Title:</strong> {propertyTitle}</p>
+                </div>
+              )}
             </div>
 
-            <div className="modal-actions-row">
-              <button
-  className="submit-whatsapp-payment-btn"
-  onClick={handleWhatsAppSubmit}
-  disabled={whatsappLoading}
->
-  {whatsappLoading ? <Loader2 className="spinner-animation" size={20} /> : <span>Submit & Pay via WhatsApp</span>}
-  <ArrowRight size={16} />
-</button>
+            {/* QR code always visible */}
 
+            {/* Action buttons */}
+            <div className="modal-actions-row">
+                <button
+                  className="buffer-share-btn"
+                  onClick={() => {
+                    const text = encodeURIComponent(`Check out this property: ${window.location.href}`);
+                    window.open(`https://publish.buffer.com/compose?text=${text}`, '_blank');
+                  }}
+                  style={{ padding: '8px 12px', background: '#14171A', color: '#fff', borderRadius: '4px' }}
+                >Share on Buffer</button>
 
               <div className="secondary-actions-group">
                 {onFreeTrial && (

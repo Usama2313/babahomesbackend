@@ -5,6 +5,7 @@ const { Op } = require("sequelize");
 const Property = require("../models/Property");
 const User = require("../models/User");
 const { upload } = require("../controllers/uploadLogo");
+const { upload: uploadMediaFile, uploadMedia } = require("../controllers/uploadMedia");
 
 const router = express.Router();
 
@@ -253,6 +254,9 @@ router.get("/:id", async (req, res) => {
     }
 });
 
+// UPLOAD Media route
+router.post("/upload-media", auth, uploadMediaFile.single("file"), uploadMedia);
+
 // CREATE property
 router.post("/", auth, async (req, res) => {
     try {
@@ -375,7 +379,62 @@ router.post('/:id/generated-video-base64', auth, async (req, res) => {
     }
 });
 
-// DELETE property
+        // SHARE property via Buffer API
+        router.post('/:id/share', auth, async (req, res) => {
+            try {
+                const user = await User.findByPk(req.user.id);
+                // Load property
+                const property = await Property.findByPk(req.params.id);
+                if (!property) {
+                    return res.status(404).json({ message: 'Property not found' });
+                }
+                // Determine trial usage
+                const now = new Date();
+                const trialPeriodMs = 15 * 24 * 60 * 60 * 1000;
+                // Initialize trial start if not set
+                if (!user.trialStartDate) {
+                    user.trialStartDate = now;
+                    user.trialPostCount = 0;
+                }
+                const trialActive = (now - new Date(user.trialStartDate)) <= trialPeriodMs;
+                // Check quota
+                if (trialActive && user.trialPostCount >= 10) {
+                    // Exceeded trial, require payment
+                    if (user.phillsBalance < 400) {
+                        return res.status(403).json({ message: 'Insufficient phills for sharing. Need 400 phills.' });
+                    }
+                    // Deduct phills
+                    user.phillsBalance -= 400;
+                    await user.save();
+                } else if (trialActive) {
+                    // Within trial, increment counter
+                    user.trialPostCount += 1;
+                    await user.save();
+                } else {
+                    // Trial expired, treat as paid
+                    if (user.phillsBalance < 400) {
+                        return res.status(403).json({ message: 'Insufficient phills for sharing. Need 400 phills.' });
+                    }
+                    user.phillsBalance -= 400;
+                    await user.save();
+                }
+
+                const { channels, caption } = req.body;
+                // Simple mapping placeholder – replace with real profile IDs
+                const profileIds = channels && channels.length > 0 ? channels : [];
+                const mediaUrl = property.generatedVideo || (property.gallery && JSON.parse(property.gallery)[0]) || property.image || '';
+                const bufferService = require('../services/bufferService');
+                await bufferService.postToBuffer({ mediaUrl, caption: caption || '', profileIds });
+                // Record share (optional – could create SharedProperty model)
+                // Respond success
+                res.json({ success: true, message: 'Property shared via Buffer.' });
+            } catch (err) {
+                console.error('Share error:', err);
+                res.status(500).json({ message: err.message || 'Failed to share property.' });
+            }
+        });
+
+// DELETE (soft) property - set hidden flag instead of removing from DB
 router.delete("/:id", auth, async (req, res) => {
     try {
         const property = await Property.findOne({
@@ -391,9 +450,10 @@ router.delete("/:id", auth, async (req, res) => {
             });
         }
 
-        await property.destroy();
+        // Soft delete: mark as hidden and not approved
+        await property.update({ isHidden: true, isApproved: false });
 
-        res.json({ message: "Property deleted" });
+        res.json({ message: "Property has been hidden (soft deleted)" });
     } catch (error) {
         res.status(500).json({ message: error.message });
     }

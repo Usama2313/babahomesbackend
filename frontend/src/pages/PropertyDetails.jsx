@@ -3,6 +3,7 @@ import { useParams, Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
   MapPin, Bed, Bath, Maximize, CalendarDays, Key, Building2, User,
+
   CheckCircle, Info, ArrowLeft, Phone, Mail, Share2, Heart,
   ShieldCheck, Droplets, Zap, Users, Car, Home, CloudRain, Wifi,
   MessageSquare, Send, Video, Loader2
@@ -41,6 +42,78 @@ const getAmenityIcon = (name) => {
     'Visitor Parking': <Car size={20} />
   };
   return map[name] || <CheckCircle size={20} />;
+};
+
+const handleShare = async () => {
+  const baseUrl = window.location.href;
+  const title = property?.title || '';
+  const description = property?.description || '';
+  const address = `${property?.locality || ''}, ${property?.city || ''}, ${property?.country || ''}`;
+const toAbsolute = (url) => url.startsWith('http') ? url : `${window.location.origin}${url.startsWith('/') ? '' : '/'}${url}`;
+  let galleryArr = property?.gallery;
+  try { if (typeof galleryArr === 'string') galleryArr = JSON.parse(galleryArr); } catch (e) { galleryArr = []; }
+  const imageLinks = (Array.isArray(galleryArr) ? galleryArr.filter(i => typeof i === 'string' && !i.startsWith('data:video')) : []).slice(0,5).map(toAbsolute);
+  const videoLinks = (Array.isArray(galleryArr) ? galleryArr.filter(i => typeof i === 'string' && i.startsWith('data:video')) : []).map(toAbsolute);
+  if (property?.generatedVideo) {
+    videoLinks.unshift(toAbsolute(property.generatedVideo));
+  }
+  const lines = [];
+  lines.push(`${title} - ${description}`);
+  if (address) lines.push(`Location: ${address}`);
+  lines.push(`Check it out! ${baseUrl}`);
+  if (imageLinks.length) lines.push('Images:', ...imageLinks);
+  if (videoLinks.length) lines.push('Videos:', ...videoLinks);
+  const caption = lines.join('\n');
+  const apiKey = import.meta.env.VITE_BUFFER_API_KEY;
+  const channelId = import.meta.env.VITE_BUFFER_CHANNEL_ID;
+  if (apiKey && channelId) {
+    try {
+      const graphqlQuery = `
+        mutation CreatePost($input: CreatePostInput!) {
+          createPost(input: $input) {
+            ... on PostActionSuccess {
+              post { id }
+            }
+            ... on MutationError { message }
+          }
+        }`;
+      const assets = [
+        ...imageLinks.map(url => ({ image: { url } })),
+        ...videoLinks.map(url => ({ video: { url } })),
+      ];
+      const response = await fetch('https://publish.buffer.com/graphql', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          query: graphqlQuery,
+          variables: {
+            input: {
+              text: caption,
+              channelId,
+              assets,
+            },
+          },
+        }),
+      });
+      const result = await response.json();
+      if (result?.errors) {
+        throw new Error(result.errors[0]?.message || 'Buffer API Error');
+      }
+      const postId = result?.data?.createPost?.post?.id;
+      if (postId) {
+        window.open(`https://publish.buffer.com/updates/${postId}`, '_blank');
+        return;
+      }
+    } catch (err) {
+      console.error('Buffer request failed', err);
+      toast.error('Sharing via Buffer failed. Using standard share method.');
+    }
+  }
+  // Fallback
+  window.open(`https://publish.buffer.com/compose?text=${encodeURIComponent(caption)}`, '_blank');
 };
 
 const PropertyDetails = () => {
@@ -254,38 +327,7 @@ const PropertyDetails = () => {
         <div className="pd-actions">
           <button
             className="pd-icon-btn"
-            onClick={async () => {
-              const url = window.location.href;
-              const propertyTitle = property.title || `${property.bhkType || ''} ${property.apartmentType || property.type || 'Property'} in ${property.locality || property.city}`;
-              const text = `Check out this property on Baba Homs: ${propertyTitle}`;
-
-              if (navigator.share) {
-                try {
-                  await navigator.share({
-                    title: 'Baba Homs Property',
-                    text: text,
-                    url: url
-                  });
-                  return;
-                } catch (err) {
-                  // Silently fail if user cancelled or system error
-                  if (err.name !== 'AbortError') console.error("Share failed", err);
-                }
-              }
-
-              // Fallback for desktop or failed navigator.share
-              try {
-                await navigator.clipboard.writeText(url);
-                toast.success("Link copied to clipboard!");
-                setTimeout(() => {
-                  if (window.confirm("Would you like to share this on WhatsApp?")) {
-                    window.open(`https://wa.me/?text=${encodeURIComponent(text + " " + url)}`, '_blank');
-                  }
-                }, 400);
-              } catch (err) {
-                window.open(`https://wa.me/?text=${encodeURIComponent(text + " " + url)}`, '_blank');
-              }
-            }}
+            onClick={handleShare}
           >
             <Share2 size={18} /> Share
           </button>
@@ -335,36 +377,33 @@ const PropertyDetails = () => {
             <Video size={18} /> {generatedVideo ? 'Regenerate Video' : 'Convert Images to Video'}
           </button>
         )}
-        {videoSaveStatus === 'saving' && <span style={{ fontSize: '13px', color: '#6366f1', fontWeight: 500 }}>⏳ Saving to database...</span>}
-        {videoSaveStatus === 'saved' && <span style={{ fontSize: '13px', color: '#16a34a', fontWeight: 500 }}>✅ Saved – video will persist after reload</span>}
-        {videoSaveStatus === 'error' && <span style={{ fontSize: '13px', color: '#dc2626', fontWeight: 500 }}>⚠️ Video shown locally but not saved to DB</span>}
       </div>
 
-      {/* Generated AI Video Display */}
-      {(generatedVideo || property?.generatedVideo) && (
-        <div className="pd-video-tour-section small-player" style={{ padding: '0 20px', marginBottom: '30px' }}>
-          <h2 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Video size={20} /> AI Generated Property Video</h2>
-          <div className="pd-video-container-small" style={{ borderRadius: '12px', overflow: 'hidden', boxShadow: '0 4px 12px rgba(0,0,0,0.15)', background: '#000' }}>
-            <video
-              key={generatedVideo || property.generatedVideo}
-              src={generatedVideo || property.generatedVideo}
-              controls
-              controlsList="nodownload"
-              style={{ width: '100%', display: 'block', maxHeight: '480px', borderRadius: '8px' }}
-            />
-          </div>
-          <p style={{ marginTop: '8px', fontSize: '13px', color: '#64748b' }}>This video is generated from property images. Use the share button above to share this property.</p>
-        </div>
-      )}
 
-      {videos.length > 0 && (
-        <div className="pd-video-tour-section small-player">
-          <h2><Video size={20} /> Video Tour</h2>
-          <div className="pd-video-container-small">
-            <video src={videos[0]} controls />
-          </div>
+      <div className="pd-video-tour-section small-player" style={{ padding: '0 20px', marginBottom: '30px' }}>
+        <div className="pd-video-container-small" style={{ borderRadius: '12px', overflow: 'visible', boxShadow: '0 4px 12px rgba(0,0,0,0.15)', background: '#000' }}>
+          <video
+            key={generatedVideo || property.generatedVideo}
+            src={generatedVideo || property.generatedVideo}
+            controls
+            controlsList="nodownload"
+            style={{ width: '100%', display: 'block', maxHeight: '480px', borderRadius: '8px' }}
+          />
         </div>
-      )}
+      </div>
+
+
+      {
+        videos.length > 0 && (
+          <div className="pd-video-tour-section small-player">
+            <h2><Video size={20} /> Video Tour</h2>
+            <div className="pd-video-container-small">
+              <video src={videos[0]} controls />
+            </div>
+          </div>
+        )
+      }
+
       <div className="pd-layout">
         <div className="pd-main-content">
           <div className="pd-title-section">
@@ -584,7 +623,7 @@ const PropertyDetails = () => {
           </motion.div>
         </div>
       </div>
-    </div>
+    </div >
   );
 };
 

@@ -226,15 +226,8 @@ const PostProperty = () => {
     const files = Array.from(e.target.files);
     const uploadedUrls = [];
 
-    let currentVideoCount = form.gallery.filter(f => typeof f === 'string' && f.includes('video')).length;
-    let newVideoCount = 0;
-
     for (let file of files) {
       if (file.type.startsWith('video/')) {
-        if (currentVideoCount + newVideoCount >= 1) {
-          toast.error("Only one video is allowed.");
-          continue;
-        }
         if (file.size > 2 * 1024 * 1024) {
           toast.error(`${file.name} exceeds 2MB limit.`);
           continue;
@@ -255,7 +248,6 @@ const PostProperty = () => {
         }
         const url = await uploadMedia(file);
         uploadedUrls.push(url);
-        newVideoCount++;
       } else if (file.type.startsWith('image/')) {
         const isHorizontal = await new Promise((resolve) => {
           const img = new Image();
@@ -1245,7 +1237,12 @@ Here is the transfer receipt screenshot. Please verify it, increase my listing l
                   </div>
                   <div className="photoSlotsGrid">
                     {[0, 1, 2, 3, 4, 5].map((slotIdx) => {
-                      const imageFiles = form.gallery.filter(f => f instanceof File && f.type.startsWith('image/'));
+                      const imageFiles = form.gallery.filter(f => (
+        // Any string is assumed to be an image URL
+        typeof f === 'string' ||
+        // File objects that are images
+        (f instanceof File && f.type.startsWith('image/'))
+      ));
                       const file = imageFiles[slotIdx];
                       return (
                         <div key={slotIdx} className={`photoSlot ${file ? 'filled' : 'empty'}`}
@@ -1255,7 +1252,11 @@ Here is the transfer receipt screenshot. Please verify it, increase my listing l
                         >
                           {file ? (
                             <>
-                              <img src={URL.createObjectURL(file)} alt={`Photo ${slotIdx + 1}`} className="slotImg" />
+                              {file instanceof File ? (
+                                <img src={URL.createObjectURL(file)} alt={`Photo ${slotIdx + 1}`} className="slotImg" />
+                              ) : (
+                                <img src={file} alt={`Photo ${slotIdx + 1}`} className="slotImg" />
+                              )}
                               <span className="slotNumber">{slotIdx + 1}</span>
                               <button className="slotRemoveBtn" onClick={(e) => {
                                 e.stopPropagation();
@@ -1303,18 +1304,27 @@ Here is the transfer receipt screenshot. Please verify it, increase my listing l
                     accept="video/*"
                     onChange={handleFileUpload}
                   />
-                  {form.gallery.filter(f => f instanceof File && f.type.startsWith('video/')).length > 0 && (
+                  {form.gallery.filter(f => (
+                      (typeof f === 'string' && f) ||
+                      (f instanceof File && f.type.startsWith('video/'))
+                    )).length > 0 && (
                     <div className="videoPreviewList">
-                      {form.gallery.filter(f => f instanceof File && f.type.startsWith('video/')).map((vf, vi) => {
+                      {form.gallery.filter(f => (
+                        (typeof f === 'string' && f) ||
+                        (f instanceof File && f.type.startsWith('video/'))
+                      )).map((vf, vi) => {
                         const galleryIdx = form.gallery.indexOf(vf);
+                        const src = typeof vf === 'string' ? vf : URL.createObjectURL(vf);
                         return (
                           <div key={vi} className="videoPreviewCard">
-                            <video src={URL.createObjectURL(vf)} className="videoThumb" controls />
+                            <video src={src} className="videoThumb" controls />
                             <div className="videoPreviewInfo">
-                              <span className="fileName">{vf.name}</span>
-                              <span className="fileSize">{(vf.size / 1024).toFixed(1)} KB</span>
+                              <span className="fileName">{vf.name || 'Video'}</span>
+                              <span className="fileSize">{typeof vf !== 'string' ? (vf.size / 1024).toFixed(1) : ''} KB</span>
                             </div>
-                            <button className="slotRemoveBtn" onClick={() => setForm({ ...form, gallery: form.gallery.filter((_, idx) => idx !== galleryIdx) })}><X size={14} /></button>
+                            <button className="slotRemoveBtn" onClick={() => setForm({ ...form, gallery: form.gallery.filter((_, idx) => idx !== galleryIdx) })}>
+                              <X size={14} />
+                            </button>
                           </div>
                         );
                       })}

@@ -276,7 +276,7 @@ router.post("/", auth, async (req, res) => {
                 });
             }
         } else {
-            const limit = user.propertyLimit !== undefined ? user.propertyLimit : 1;
+            const limit = user.propertyLimit !== undefined ? user.propertyLimit : 50;
             const paidCount = await Property.count({ where: { owner: req.user.id, isTrial: false } });
             if (paidCount >= limit) {
                 // Instead of throwing an error, create it as hidden so they can pay for it
@@ -470,7 +470,7 @@ router.post("/:id/pay", auth, async (req, res) => {
         }
 
         const user = await User.findByPk(req.user.id);
-        const limit = user.propertyLimit !== undefined ? user.propertyLimit : 1;
+        const limit = user.propertyLimit !== undefined ? user.propertyLimit : 50;
         const paidCount = await Property.count({ where: { owner: req.user.id, isTrial: false } });
         if (paidCount >= limit) {
             // Keep property hidden/unapproved but allow payment simulation/request

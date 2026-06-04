@@ -1,26 +1,28 @@
 import axios from "axios";
 import toast from "react-hot-toast";
+import React from "react";
+import InvalidTokenToast from "../components/InvalidTokenToast.jsx";
+import OfflineBanner from "../components/OfflineBanner.jsx";
+
+let dbErrorShown = false;
 
 const getBaseURL = () => {
   if (import.meta.env.DEV) {
     return "http://localhost:5000/api";
   }
   return import.meta.env.VITE_API_URL || "https://babahomesbackend.vercel.app/api";
-};;
+};
 
 const baseURL = getBaseURL();
 
 const API = axios.create({
   baseURL,
   headers: {
-    "bypass-tunnel-reminder": "true"
-  }
+    "bypass-tunnel-reminder": "true",
+  },
 });
 
-
-
-
-// Request Interceptor
+// Request interceptor
 API.interceptors.request.use((config) => {
   const token = localStorage.getItem("babaToken");
   if (token) {
@@ -29,7 +31,7 @@ API.interceptors.request.use((config) => {
   return config;
 });
 
-// Response Interceptor for global error handling
+// Response interceptor
 API.interceptors.response.use(
   (response) => response,
   (error) => {
@@ -45,19 +47,25 @@ API.interceptors.response.use(
     });
 
     if (!error.config?.skipToast) {
-      toast.error(message);
+      const errorMsg = error.message || '';
+const isConnectionError = (error.response && error.response.status >= 500) || errorMsg.toLowerCase().includes('failed') || errorMsg.toLowerCase().includes('network');
+      if (isConnectionError) {
+        console.log('🔔 OfflineBanner triggered');
+        toast.custom(
+          (t) => React.createElement(OfflineBanner, { t }),
+          { duration: 10000, style: { background: 'transparent' } }
+        );
+      } else {
+        toast.error(message);
+      }
     }
 
     if (error.response?.status === 401) {
-      // Show custom toast for invalid token with WhatsApp link
-      toast.error('Token is not valid – please log in again. ' +
-        `<a href="https://wa.me/973322271249" target="_blank" style="color:#1e90ff; text-decoration:underline;">WhatsApp +973322271249</a>`);
-      // Optionally clear auth data
-      // localStorage.removeItem('babaToken');
-      // window.location.href = '/login';
+      toast.custom(
+        (t) => React.createElement(InvalidTokenToast, { t }),
+        { duration: 8000, style: { background: "transparent" } }
+      );
     }
-    // localStorage.clear();
-    // window.location.href = "/login";
 
     return Promise.reject(error);
   }

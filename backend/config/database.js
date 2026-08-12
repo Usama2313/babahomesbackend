@@ -1,9 +1,15 @@
 const { Sequelize } = require("sequelize");
 require("dotenv").config();
 
-const isPostgres = process.env.POSTGRES_URL || process.env.DATABASE_URL || process.env.DB_DIALECT === "postgres";
+const defaultNeonUrl = "postgresql://neondb_owner:npg_xKTgrU08nzHd@ep-purple-hat-anq529vu-pooler.c-6.us-east-1.aws.neon.tech/neondb?sslmode=require";
 
 let dbUrl = process.env.POSTGRES_URL || process.env.DATABASE_URL;
+
+// Bypass stale or deleted database environment variables (e.g. old Supabase instance)
+if (!dbUrl || dbUrl.includes("awweckttcpgzxbvntiyv")) {
+    dbUrl = defaultNeonUrl;
+}
+
 if (dbUrl && dbUrl.includes("sslmode=")) {
     dbUrl = dbUrl.split("?")[0];
 }

@@ -1,12 +1,12 @@
 const { Sequelize } = require("sequelize");
 require("dotenv").config();
 
-const defaultNeonUrl = "postgresql://neondb_owner:npg_xKTgrU08nzHd@ep-purple-hat-anq529vu-pooler.c-6.us-east-1.aws.neon.tech/neondb?sslmode=require";
+const defaultNeonUrl = "postgresql://neondb_owner:npg_xKTgrU08nzHd@ep-purple-hat-anq529vu-pooler.c-6.us-east-1.aws.neon.tech/neondb";
 
-let dbUrl = process.env.POSTGRES_URL || process.env.DATABASE_URL;
+let dbUrl = process.env.DATABASE_URL || process.env.POSTGRES_URL || defaultNeonUrl;
 
-// If URL is missing, points to old Supabase, or is not Neon, force active Neon URL
-if (!dbUrl || dbUrl.includes("supabase") || dbUrl.includes("awweck") || !dbUrl.includes("neon.tech")) {
+// If URL is missing, invalid, or doesn't use neondb_owner, force active Neon URL
+if (!dbUrl || dbUrl.includes("supabase") || dbUrl.includes("awweck") || !dbUrl.includes("neondb_owner")) {
     dbUrl = defaultNeonUrl;
 }
 

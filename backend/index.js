@@ -160,12 +160,12 @@ const path = require('path');
         try {
             const sequelize = require("./config/database");
             await sequelize.authenticate();
-            res.json({ status: "ok", database: "connected", version: "v2.0-neon-fixed", time: new Date() });
+            res.json({ status: "ok", database: "connected", version: "v2.2-neon-explicit", time: new Date() });
         } catch (err) {
             res.status(500).json({
                 status: "error",
                 database: "disconnected",
-                version: "v2.0-neon-fixed",
+                version: "v2.2-neon-explicit",
                 message: err.message,
                 time: new Date()
             });

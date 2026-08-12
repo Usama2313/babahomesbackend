@@ -25,6 +25,11 @@ const sequelize = new Sequelize(dbUrl, {
     dialect: "postgres",
     dialectModule: require("pg"),
     logging: false,
+    host: "ep-purple-hat-anq529vu-pooler.c-6.us-east-1.aws.neon.tech",
+    username: "neondb_owner",
+    password: "npg_xKTgrU08nzHd",
+    database: "neondb",
+    port: 5432,
     dialectOptions: {
         ssl: {
             require: true,

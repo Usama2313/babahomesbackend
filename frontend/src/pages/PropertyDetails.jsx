@@ -12,6 +12,7 @@ import API from "../api";
 import toast from "react-hot-toast";
 import { fallbackProperties } from "../utils/constants";
 import ChatWindow from "../components/ChatWindow";
+import watermarkImg from "../assets/watermark.png";
 
 const formatTime12Hour = (timeStr) => {
   if (!timeStr) return '';
@@ -20,6 +21,11 @@ const formatTime12Hour = (timeStr) => {
   const ampm = hour >= 12 ? 'PM' : 'AM';
   hour = hour % 12 || 12;
   return `${hour}:${m} ${ampm}`;
+};
+
+const isVideo = (url) => {
+  if (!url) return false;
+  return /\.(mp4|webm|mov|mkv|avi)$/i.test(url);
 };
 const getAmenityIcon = (name) => {
   const map = {
@@ -44,76 +50,120 @@ const getAmenityIcon = (name) => {
   return map[name] || <CheckCircle size={20} />;
 };
 
-const handleShare = async () => {
+const handleShare = async (property, apiInstance) => {
+  const propertyId = property?.id || property?._id;
+  if (!propertyId) {
+    toast.error('Cannot share: property ID not found.');
+    return;
+  }
+
   const baseUrl = window.location.href;
   const title = property?.title || '';
   const description = property?.description || '';
   const address = `${property?.locality || ''}, ${property?.city || ''}, ${property?.country || ''}`;
-const toAbsolute = (url) => url.startsWith('http') ? url : `${window.location.origin}${url.startsWith('/') ? '' : '/'}${url}`;
+
+  // Build comprehensive caption with all property details
+  const lines = [];
+  lines.push(`🏠 ${title}`);
+  if (description) lines.push(`\n📋 Description:\n${description}`);
+  if (address && address.trim() !== ', ,') lines.push(`\n📍 Location: ${address}`);
+
+  // Price info
+  const price = property?.price || property?.rentAmount;
+  if (price) {
+    const currency = property?.currency || '₹';
+    const priceLabel = property?.adType === 'Buy' ? 'Price' : 'Rent';
+    lines.push(`\n💰 ${priceLabel}: ${currency} ${Number(price).toLocaleString()}${property?.adType === 'Buy' ? '' : '/month'}`);
+    if (property?.rentNegotiable) lines.push('   (Negotiable)');
+  }
+  if (property?.securityDeposit) lines.push(`🔒 Security Deposit: ${property?.currency || '₹'} ${Number(property.securityDeposit).toLocaleString()}`);
+  if (property?.maintenanceAmount) lines.push(`🔧 Maintenance: ${property?.currency || '₹'} ${property.maintenanceAmount}`);
+
+  // Property specs
+  const specs = [];
+  if (property?.bhkType) specs.push(`🛏️ ${property.bhkType}`);
+  else if (property?.bedrooms) specs.push(`🛏️ ${property.bedrooms} Bedrooms`);
+  if (property?.bathrooms) specs.push(`🚿 ${property.bathrooms} Bathrooms`);
+  const area = property?.builtUpArea || property?.area;
+  if (area) specs.push(`📐 ${area} Sq.ft`);
+  if (property?.furnishing) specs.push(`🪑 ${property.furnishing}`);
+  if (specs.length) lines.push(`\n${specs.join(' | ')}`);
+
+  // Additional details
+  const details = [];
+  if (property?.apartmentType || property?.type) details.push(`Type: ${property.apartmentType || property.type}`);
+  if (property?.adType) details.push(`Ad Type: ${property.adType}`);
+  if (property?.propertyAge) details.push(`Property Age: ${property.propertyAge}`);
+  if (property?.possessionStatus) details.push(`Possession: ${property.possessionStatus}`);
+  if (property?.facing) details.push(`Facing: ${property.facing}`);
+  if (property?.floorNo) details.push(`Floor: ${property.floorNo}${property.totalFloors ? ` of ${property.totalFloors}` : ''}`);
+  if (property?.balconies) details.push(`Balconies: ${property.balconies}`);
+  if (property?.waterSupply) details.push(`Water Supply: ${property.waterSupply}`);
+  if (property?.parking) details.push(`Parking: ${property.parking}`);
+  if (property?.propertyCondition) details.push(`Condition: ${property.propertyCondition}`);
+  if (details.length) lines.push(`\n🏗️ Details:\n${details.map(d => `  • ${d}`).join('\n')}`);
+
+  // Amenities
+  let amenitiesArr = property?.amenities;
+  try { if (typeof amenitiesArr === 'string') amenitiesArr = JSON.parse(amenitiesArr); } catch (e) { amenitiesArr = []; }
+  if (Array.isArray(amenitiesArr) && amenitiesArr.length > 0) {
+    lines.push(`\n✨ Amenities: ${amenitiesArr.join(', ')}`);
+  }
+
+  // Rules & Preferences
+  const rules = [];
+  let prefTenants = property?.preferredTenants;
+  try { if (typeof prefTenants === 'string') prefTenants = JSON.parse(prefTenants); } catch (e) { prefTenants = []; }
+  if (Array.isArray(prefTenants) && prefTenants.length > 0) rules.push(`Preferred Tenants: ${prefTenants.join(', ')}`);
+  if (property?.availableFor) rules.push(`Available For: ${property.availableFor}`);
+  if (property?.petAllowed) rules.push(`Pets: ${property.petAllowed === 'Yes' ? 'Allowed' : 'Not Allowed'}`);
+  if (property?.nonVeg) rules.push(`Non-Veg: ${property.nonVeg === 'Yes' ? 'Allowed' : 'Not Allowed'}`);
+  if (property?.gym) rules.push(`Gym: ${property.gym === 'Yes' ? 'Available' : 'Not Available'}`);
+  if (property?.gatedSecurity) rules.push(`Gated Security: ${property.gatedSecurity === 'Yes' ? 'Yes' : 'No'}`);
+  if (rules.length) lines.push(`\n📜 Rules & Preferences:\n${rules.map(r => `  • ${r}`).join('\n')}`);
+
+  if (property?.availableFrom) lines.push(`\n📅 Available From: ${property.availableFrom}`);
+  lines.push(`\n🔗 Check it out: ${baseUrl}`);
+
+  // Cap caption length to avoid oversized requests (431 error)
+  let caption = lines.join('\n');
+  if (caption.length > 2000) {
+    caption = caption.substring(0, 1997) + '...';
+  }
+
+  // Collect image & video URLs — filter out base64 data URIs which are huge and cause 431 errors
+  const isRealUrl = (url) => typeof url === 'string' && !url.startsWith('data:');
+  const toAbsolute = (url) => url.startsWith('http') ? url : `${window.location.origin}${url.startsWith('/') ? '' : '/'}${url}`;
   let galleryArr = property?.gallery;
   try { if (typeof galleryArr === 'string') galleryArr = JSON.parse(galleryArr); } catch (e) { galleryArr = []; }
-  const imageLinks = (Array.isArray(galleryArr) ? galleryArr.filter(i => typeof i === 'string' && !i.startsWith('data:video')) : []).slice(0,5).map(toAbsolute);
-  const videoLinks = (Array.isArray(galleryArr) ? galleryArr.filter(i => typeof i === 'string' && i.startsWith('data:video')) : []).map(toAbsolute);
-  if (property?.generatedVideo) {
-    videoLinks.unshift(toAbsolute(property.generatedVideo));
+  const imageUrls = (Array.isArray(galleryArr) ? galleryArr.filter(i => isRealUrl(i) && !i.match(/\.(mp4|webm|mov|mkv|avi)$/i)) : []).slice(0, 5).map(toAbsolute);
+  const videoUrls = (Array.isArray(galleryArr) ? galleryArr.filter(i => isRealUrl(i) && i.match(/\.(mp4|webm|mov|mkv|avi)$/i)) : []).slice(0, 2).map(toAbsolute);
+  if (property?.generatedVideo && isRealUrl(property.generatedVideo)) {
+    videoUrls.unshift(toAbsolute(property.generatedVideo));
   }
-  const lines = [];
-  lines.push(`${title} - ${description}`);
-  if (address) lines.push(`Location: ${address}`);
-  lines.push(`Check it out! ${baseUrl}`);
-  if (imageLinks.length) lines.push('Images:', ...imageLinks);
-  if (videoLinks.length) lines.push('Videos:', ...videoLinks);
-  const caption = lines.join('\n');
-  const apiKey = import.meta.env.VITE_BUFFER_API_KEY;
-  const channelId = import.meta.env.VITE_BUFFER_CHANNEL_ID;
-  if (apiKey && channelId) {
-    try {
-      const graphqlQuery = `
-        mutation CreatePost($input: CreatePostInput!) {
-          createPost(input: $input) {
-            ... on PostActionSuccess {
-              post { id }
-            }
-            ... on MutationError { message }
-          }
-        }`;
-      const assets = [
-        ...imageLinks.map(url => ({ image: { url } })),
-        ...videoLinks.map(url => ({ video: { url } })),
-      ];
-      const response = await fetch('https://publish.buffer.com/graphql', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify({
-          query: graphqlQuery,
-          variables: {
-            input: {
-              text: caption,
-              channelId,
-              assets,
-            },
-          },
-        }),
+
+  // Call the backend share endpoint (server-side Buffer API call — no CORS/URI issues)
+  const loadingToast = toast.loading('Sharing property to Buffer...');
+  try {
+    const res = await apiInstance.post(`/properties/${propertyId}/share`, {
+      caption,
+      imageUrls,
+      videoUrls,
+    });
+    toast.dismiss(loadingToast);
+    if (res.data?.success) {
+      toast.success('Property shared to Buffer successfully via automated agent!', {
+        duration: 5000,
       });
-      const result = await response.json();
-      if (result?.errors) {
-        throw new Error(result.errors[0]?.message || 'Buffer API Error');
-      }
-      const postId = result?.data?.createPost?.post?.id;
-      if (postId) {
-        window.open(`https://publish.buffer.com/updates/${postId}`, '_blank');
-        return;
-      }
-    } catch (err) {
-      console.error('Buffer request failed', err);
-      toast.error('Sharing via Buffer failed. Using standard share method.');
+    } else {
+      toast.error(res.data?.message || 'Sharing failed.');
     }
+  } catch (err) {
+    toast.dismiss(loadingToast);
+    const msg = err.response?.data?.message || err.message || 'Failed to share property.';
+    console.error('Share error:', msg);
+    toast.error(msg);
   }
-  // Fallback
-  window.open(`https://publish.buffer.com/compose?text=${encodeURIComponent(caption)}`, '_blank');
 };
 
 const PropertyDetails = () => {
@@ -195,8 +245,14 @@ const PropertyDetails = () => {
   const preferredTenants = safeParse(property.preferredTenants, []);
   const schedule = safeParse(property.schedule, { availableDays: [], timeSlot: '' });
 
-  const images = gallery.filter(item => typeof item === 'string' && !item.startsWith('data:video'));
-  const videos = gallery.filter(item => typeof item === 'string' && item.startsWith('data:video'));
+  const images = gallery.filter(item =>
+    typeof item === 'string' &&
+    !item.match(/\.(mp4|webm|mov|mkv|avi)$/i)
+  );
+  const videos = gallery.filter(item =>
+    typeof item === 'string' &&
+    item.match(/\.(mp4|webm|mov|mkv|avi)$/i)
+  );
 
   // Convert Images to Video handler
   const handleConvertImagesToVideo = async () => {
@@ -208,22 +264,28 @@ const PropertyDetails = () => {
     setVideoSaveStatus('');
     console.log('Starting video conversion process...');
     try {
-      // Helper: load image element
-      const loadImg = src => new Promise((resolve, reject) => {
-        const img = new Image();
-        img.crossOrigin = 'anonymous';
-        img.onload = () => resolve(img);
-        img.onerror = (err) => {
-          console.warn('Failed to load image for canvas (skipping):', src, err);
-          resolve(null); // skip failed images
-        };
-        img.src = src;
-      });
+// Helper: load image element
+const loadImg = async (src) => {
+  // Determine absolute URL pointing to backend
+  const backendBase = import.meta.env.VITE_BACKEND_URL || `${window.location.origin.replace(/:\d+/, ':5000')}`;
+  const absoluteUrl = src.startsWith('http') ? src : `${backendBase}/${src.replace(/^\//, '')}`;
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => resolve(img);
+    img.onerror = () => {
+      console.warn('Failed to load image', absoluteUrl);
+      resolve(null);
+    };
+    img.src = absoluteUrl;
+  });
+};
 
       // Use a compressed canvas (max 640px wide) to keep file size small enough for DB
       const TARGET_WIDTH = 640;
 
       // Load all images first
+    console.log('Attempting to load images:', images);
       const loadedImages = (await Promise.all(images.map(loadImg))).filter(Boolean);
       if (loadedImages.length === 0) {
         toast.error('Could not load any images.');
@@ -257,12 +319,21 @@ const PropertyDetails = () => {
       const stopPromise = new Promise(resolve => { recorder.onstop = resolve; });
       recorder.start(100); // collect chunks every 100ms
 
-      // Draw each image for 2 seconds
-      for (const img of loadedImages) {
-        ctx.clearRect(0, 0, canvasW, canvasH);
-        ctx.drawImage(img, 0, 0, canvasW, canvasH);
-        await new Promise(r => setTimeout(r, 2000));
-      }
+// Draw each image for 2 seconds with watermark
+const wm = new Image();
+wm.src = watermarkImg;
+await new Promise(resolve => { wm.onload = resolve; wm.onerror = resolve; });
+const padding = 8;
+const wmSize = 60;
+for (const img of loadedImages) {
+  ctx.clearRect(0, 0, canvasW, canvasH);
+  ctx.drawImage(img, 0, 0, canvasW, canvasH);
+  // Draw watermark at bottom‑right
+  ctx.globalAlpha = 0.8;
+  ctx.drawImage(wm, canvasW - wmSize - padding, canvasH - wmSize - padding, wmSize, wmSize);
+  ctx.globalAlpha = 1.0;
+  await new Promise(r => setTimeout(r, 2000));
+}
 
       recorder.stop();
       await stopPromise;
@@ -327,7 +398,7 @@ const PropertyDetails = () => {
         <div className="pd-actions">
           <button
             className="pd-icon-btn"
-            onClick={handleShare}
+            onClick={() => handleShare(property, API)}
           >
             <Share2 size={18} /> Share
           </button>
@@ -342,17 +413,20 @@ const PropertyDetails = () => {
       </div>
 
       <div className="pd-hero-gallery">
-        <div className="pd-main-media small-scale">
-          {activeMedia ? (
-            activeMedia.startsWith('data:video') || activeMedia.startsWith('blob:') ? (
-              <video src={activeMedia} controls className="main-video-player" />
+          <div className="pd-main-media small-scale" style={{ position: 'relative' }}>
+            {activeMedia ? (
+              isVideo(activeMedia) ? (
+                <video src={activeMedia} controls className="main-video-player" style={{ width: '100%', maxHeight: '70vh', objectFit: 'contain' }} />
+              ) : (
+                <>
+                  <img src={activeMedia} alt="Property Main" key={activeMedia} style={{ width: '100%', maxHeight: '70vh', objectFit: 'contain' }} />
+                  <img src={watermarkImg} alt="watermark" className="watermark-overlay" style={{ position: 'absolute', bottom: '10px', right: '10px', width: '60px', height: '60px', opacity: 0.8 }} />
+                </>
+              )
             ) : (
-              <img src={activeMedia} alt="Property Main" key={activeMedia} />
-            )
-          ) : (
-            <div className="pd-media-placeholder" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', background: '#f0f0f0', color: '#666' }}>No Image Available</div>
-          )}
-        </div>
+              <div className="pd-media-placeholder" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', background: '#f0f0f0', color: '#666' }}>No Image Available</div>
+            )}
+          </div>
         <div className="pd-side-gallery all-visible">
           {images.map((item, idx) => (
             <div
@@ -367,12 +441,12 @@ const PropertyDetails = () => {
       </div>
 
       {/* Convert to Video button — always visible so user can regenerate */}
-      <div className="convert-video-section" style={{ marginTop: '12px', marginBottom: '24px', textAlign: 'left', padding: '0 20px', display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-        {isConverting ? (
-          <button className="convertBtn" disabled style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 20px', background: '#4f46e5', color: '#fff', border: 'none', borderRadius: '6px', opacity: 0.7, cursor: 'not-allowed', fontWeight: '600' }}>
-            <Loader2 size={18} className="animate-spin" /> Creating video...
-          </button>
-        ) : (
+         <div className="convert-video-section" style={{ marginTop: '12px', marginBottom: '24px', textAlign: 'left', padding: '0 20px', display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+           {isConverting ? (
+             <button className="convertBtn" disabled style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 20px', background: '#4f46e5', color: '#fff', border: 'none', borderRadius: '6px', opacity: 0.7, cursor: 'not-allowed', fontWeight: '600' }}>
+               <Loader2 size={18} className="animate-spin" /> Creating video...
+             </button>
+           ) : (
           <button className="convertBtn" onClick={handleConvertImagesToVideo} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 20px', background: '#4f46e5', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600', transition: 'background 0.2s' }}>
             <Video size={18} /> {generatedVideo ? 'Regenerate Video' : 'Convert Images to Video'}
           </button>
@@ -381,13 +455,13 @@ const PropertyDetails = () => {
 
 
       <div className="pd-video-tour-section small-player" style={{ padding: '0 20px', marginBottom: '30px' }}>
-        <div className="pd-video-container-small" style={{ borderRadius: '12px', overflow: 'visible', boxShadow: '0 4px 12px rgba(0,0,0,0.15)', background: '#000' }}>
+        <div className="pd-video-container-small" style={{ borderRadius: '12px', overflow: 'hidden', boxShadow: '0 4px 12px rgba(0,0,0,0.15)', background: '#000', maxWidth: '100%' }}>
           <video
             key={generatedVideo || property.generatedVideo}
             src={generatedVideo || property.generatedVideo}
             controls
             controlsList="nodownload"
-            style={{ width: '100%', display: 'block', maxHeight: '480px', borderRadius: '8px' }}
+            style={{ width: '100%', height: '200px', display: 'block', objectFit: 'contain', borderRadius: '8px' }}
           />
         </div>
       </div>
@@ -395,10 +469,14 @@ const PropertyDetails = () => {
 
       {
         videos.length > 0 && (
-          <div className="pd-video-tour-section small-player">
-            <h2><Video size={20} /> Video Tour</h2>
-            <div className="pd-video-container-small">
-              <video src={videos[0]} controls />
+          <div className="pd-video-tour-section small-player" style={{ padding: '0 20px', marginBottom: '30px' }}>
+            <h2><Video size={20} /> Video Tour ({videos.length})</h2>
+            <div className="pd-video-list" style={{ display: 'flex', gap: '15px', overflowX: 'auto', paddingBottom: '10px' }}>
+              {videos.map((vid, idx) => (
+                <div key={idx} className="pd-video-container-small" style={{ flex: '0 0 auto', width: '280px', borderRadius: '12px', overflow: 'hidden', boxShadow: '0 4px 12px rgba(0,0,0,0.15)', background: '#000' }}>
+                  <video src={vid} controls style={{ width: '100%', height: '200px', display: 'block', objectFit: 'contain' }} />
+                </div>
+              ))}
             </div>
           </div>
         )

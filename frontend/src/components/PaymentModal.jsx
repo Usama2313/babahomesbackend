@@ -63,11 +63,13 @@ const PaymentModal = ({ isOpen, onClose, region = 'india', onPayNow, onFreeTrial
 
   const iban = region === 'gcc' ? paymentConstants.IBAN_GCC : paymentConstants.IBAN_INDIA;
 
-  // Previously handled payment submission; now we directly open WhatsApp for payment.
-  const handleWhatsAppSubmit = () => {
-    // Open WhatsApp with a prefilled message for payment.
-    const message = encodeURIComponent('I would like to pay for the selected plan.');
-    window.open(`https://wa.me/97332271249?text=${message}`, '_blank');
+  const handlePostProperty = () => {
+    if (onPayNow) {
+      onPayNow({
+        label: selectedTier === 'one' ? '1 Property' : selectedTier === 'ten' ? '10 Properties' : selectedTier === 'fifty' ? '50 Properties' : `${customQty} Properties`,
+        price: price
+      });
+    }
   };
 
 
@@ -96,8 +98,7 @@ const PaymentModal = ({ isOpen, onClose, region = 'india', onPayNow, onFreeTrial
             </p>
 
             <div className="qr-code-box" style={{ textAlign: 'center', marginTop: '20px' }}>
-              <h3>Payment QR Code</h3>
-              <img src={QRcodeImg} alt="Payment QR Code" style={{ width: '200px', margin: '10px auto' }} />
+              {/* QR code removed – displayed on PostProperty intro page */}
             </div>
 
             <div className="plan-selection-container">
@@ -137,44 +138,40 @@ const PaymentModal = ({ isOpen, onClose, region = 'india', onPayNow, onFreeTrial
                 <DollarSign size={20} className="dollar-icon" />
                 <span className="price-value">{price}</span>
               </div>
-              <button 
-                className="confirm-payment-btn" 
-                onClick={() => setPaymentConfirmed(true)}
-                style={{ marginTop: '10px', width: '100%' }}
-              >
-                Confirm Payment Details
-              </button>
-              {paymentConfirmed && (
-                <div className="confirmed-details" style={{ marginTop: '15px', padding: '10px', background: '#e6fffa', borderRadius: '4px' }}>
-                  <p><strong>Payment Status:</strong> Confirmed</p>
-                  <p><strong>Plan:</strong> {selectedTier} ({price})</p>
-                  <p><strong>Name:</strong> {userName}</p>
-                  <p><strong>Phone:</strong> {userPhone}</p>
-                  <p><strong>Property ID:</strong> {propertyId}</p>
-                  <p><strong>Title:</strong> {propertyTitle}</p>
-                </div>
-              )}
             </div>
 
             {/* QR code always visible */}
 
             {/* Action buttons */}
-            <div className="modal-actions-row">
-                <button
-                  className="buffer-share-btn"
-                  onClick={() => {
-                    const text = encodeURIComponent(`Check out this property: ${window.location.href}`);
-                    window.open(`https://publish.buffer.com/compose?text=${text}`, '_blank');
-                  }}
-                  style={{ padding: '8px 12px', background: '#14171A', color: '#fff', borderRadius: '4px' }}
-                >Share on Buffer</button>
+            <div className="modal-actions-row" style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+              <button 
+                className="whatsapp-submit-btn" 
+                onClick={handlePostProperty}
+                style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'center', 
+                  gap: '8px', 
+                  backgroundColor: '#3b82f6', 
+                  color: 'white', 
+                  padding: '12px 15px', 
+                  borderRadius: '6px', 
+                  border: 'none', 
+                  cursor: 'pointer',
+                  fontWeight: 'bold',
+                  width: '100%',
+                  fontSize: '16px',
+                  boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                }}
+              >
+                Post Property
+              </button>
 
-              <div className="secondary-actions-group">
-                {onFreeTrial && (
+              <div className="secondary-actions-group" style={{ display: 'flex', justifyContent: 'flex-end', width: '100%', gap: '10px' }}>
+                {onFreeTrial && trialCount < 10 && (
                   <button 
                     className="free-trial-activation-btn" 
                     onClick={async () => {
-                      if (trialCount >= 10) return;
                       setFreeTrialLoading(true);
                       try {
                         await onFreeTrial();
@@ -182,8 +179,7 @@ const PaymentModal = ({ isOpen, onClose, region = 'india', onPayNow, onFreeTrial
                         setFreeTrialLoading(false);
                       }
                     }} 
-                    disabled={freeTrialLoading || trialCount >= 10}
-                    style={trialCount >= 10 ? { opacity: 0.5, cursor: 'not-allowed' } : {}}
+                    disabled={freeTrialLoading}
                   >
                     {freeTrialLoading ? (
                       <Loader2 className="spinner-animation" size={20} />

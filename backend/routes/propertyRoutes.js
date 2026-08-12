@@ -380,54 +380,27 @@ router.post('/:id/generated-video-base64', auth, async (req, res) => {
 });
 
         // SHARE property via Buffer API
-        router.post('/:id/share', auth, async (req, res) => {
+        router.post('/:id/share', async (req, res) => {
             try {
-                const user = await User.findByPk(req.user.id);
-                // Load property
                 const property = await Property.findByPk(req.params.id);
                 if (!property) {
                     return res.status(404).json({ message: 'Property not found' });
                 }
-                // Determine trial usage
-                const now = new Date();
-                const trialPeriodMs = 15 * 24 * 60 * 60 * 1000;
-                // Initialize trial start if not set
-                if (!user.trialStartDate) {
-                    user.trialStartDate = now;
-                    user.trialPostCount = 0;
-                }
-                const trialActive = (now - new Date(user.trialStartDate)) <= trialPeriodMs;
-                // Check quota
-                if (trialActive && user.trialPostCount >= 10) {
-                    // Exceeded trial, require payment
-                    if (user.phillsBalance < 400) {
-                        return res.status(403).json({ message: 'Insufficient phills for sharing. Need 400 phills.' });
-                    }
-                    // Deduct phills
-                    user.phillsBalance -= 400;
-                    await user.save();
-                } else if (trialActive) {
-                    // Within trial, increment counter
-                    user.trialPostCount += 1;
-                    await user.save();
-                } else {
-                    // Trial expired, treat as paid
-                    if (user.phillsBalance < 400) {
-                        return res.status(403).json({ message: 'Insufficient phills for sharing. Need 400 phills.' });
-                    }
-                    user.phillsBalance -= 400;
-                    await user.save();
-                }
 
-                const { channels, caption } = req.body;
-                // Simple mapping placeholder – replace with real profile IDs
-                const profileIds = channels && channels.length > 0 ? channels : [];
-                const mediaUrl = property.generatedVideo || (property.gallery && JSON.parse(property.gallery)[0]) || property.image || '';
+                const { caption, imageUrls = [], videoUrls = [] } = req.body;
+
                 const bufferService = require('../services/bufferService');
-                await bufferService.postToBuffer({ mediaUrl, caption: caption || '', profileIds });
-                // Record share (optional – could create SharedProperty model)
-                // Respond success
-                res.json({ success: true, message: 'Property shared via Buffer.' });
+                const result = await bufferService.postToBuffer({
+                    caption: caption || '',
+                    imageUrls,
+                    videoUrls,
+                });
+
+                res.json({
+                    success: true,
+                    message: result.message || 'Property shared via Buffer.',
+                    postId: result.postId || null,
+                });
             } catch (err) {
                 console.error('Share error:', err);
                 res.status(500).json({ message: err.message || 'Failed to share property.' });

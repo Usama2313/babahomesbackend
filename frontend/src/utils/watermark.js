@@ -26,11 +26,11 @@ const loadLogoImage = (logoUrl) => {
 const drawWatermarkPattern = (ctx, width, height, logoImg = null) => {
   if (logoImg) {
     ctx.save();
-    // Bounding box size (approx 15% of canvas width for professional balance)
-    const maxSize = Math.max(80, width * 0.15);
+    // Bounding box size forced to 60x60px for precise watermark dimensions
+    const maxSize = 60;
     let newWidth, newHeight;
 
-    // Proportionally calculate both height and width based on logo aspect ratio
+    // Preserve aspect ratio while fitting within 25x25 box
     if (logoImg.width >= logoImg.height) {
       newWidth = maxSize;
       newHeight = logoImg.height * (maxSize / logoImg.width);
@@ -39,9 +39,9 @@ const drawWatermarkPattern = (ctx, width, height, logoImg = null) => {
       newWidth = logoImg.width * (maxSize / logoImg.height);
     }
 
-    // Position with 2% padding, shifted to the left by 15% of width to avoid card overlays (like wishlist heart)
-    const padding = Math.max(10, width * 0.02);
-    const x = width - newWidth - padding - (width * 0.15);
+    // Position with minimal 5px padding from top-right corner
+    const padding = Math.max(5, width * 0.01);
+    const x = width - newWidth - padding;
     const y = padding;
 
     ctx.globalAlpha = 0.45; // decreased opacity for a softer blend

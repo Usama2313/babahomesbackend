@@ -8,11 +8,14 @@ import {
   ArrowLeft, ArrowRight, Map, Search, MapPin, Building2,
   LayoutDashboard, Image as ImageIcon, Calendar, Wifi,
   Droplets, Zap, CloudRain, Car, Home, User, Video,
-  Plus, Camera, Trash2, Key, Info, CheckCircle, Sparkles, Wand2, Loader2
+  Plus, Camera, Trash2, Key, Info, CheckCircle, Sparkles, Wand2, Loader2,
+  Award, DollarSign, MessageSquare
 } from "lucide-react";
 import API from "../api";
 import { paymentConstants } from "../utils/paymentConstants";
+import QRcodeImg from "../assets/QRcode.jpeg";
 import PaymentModal from "../components/PaymentModal";
+import "../components/PaymentModal.css";
 import { countryCityMap, countryCurrencyMap } from "../utils/constants";
 
 const PostProperty = () => {
@@ -24,6 +27,105 @@ const PostProperty = () => {
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [pendingPayload, setPendingPayload] = useState(null);
   const [activeMedia, setActiveMedia] = useState(null);
+  const [showIntroModal, setShowIntroModal] = useState(true);
+
+  // Function to open WhatsApp with a share message after payment
+  const handleWhatsAppShare = () => {
+    const message = encodeURIComponent("I've completed the payment for my property listing. Please find the details attached.");
+    const waNumber = "+97332271249";
+    const waUrl = `https://wa.me/${waNumber.replace('+', '')}?text=${message}`;
+    window.open(waUrl, '_blank');
+  };
+
+  // Close the intro modal and optionally proceed to payment modal
+  const proceedToPayment = () => {
+    setShowIntroModal(false);
+    setShowPaymentModal(true);
+  };
+
+  // Close the intro modal without payment (e.g., just view free trial info)
+  const closeIntroModal = () => {
+    setShowIntroModal(false);
+  };
+
+  // Render the introductory modal on page load, matching PaymentModal UI exactly
+  const IntroModal = () => (
+    <div className="payment-modal-overlay">
+      <div className="payment-modal-card" style={{ maxHeight: '90vh', overflowY: 'auto' }}>
+        <button className="payment-modal-close-btn" onClick={closeIntroModal} aria-label="Close intro modal">
+          <X size={18} />
+        </button>
+        <div className="payment-content-section">
+          <div className="modal-header-badge">
+            <Award className="badge-icon" size={16} />
+            <span>Welcome to Baba Homs</span>
+          </div>
+
+          <h2 style={{ fontSize: '20px' }}>List your property and find genuine tenants &amp; buyers</h2>
+
+          <p className="payment-description">
+            Start a <strong>Free Trial</strong> for 15 days or choose a premium plan to keep your properties visible permanently.
+          </p>
+
+          <div className="pricing-summary-card" style={{ display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'flex-start' }}>
+            <span className="price-label" style={{ marginBottom: '4px' }}>Our Pricing Plans:</span>
+            <div className="price-value-container" style={{ width: '100%', display: 'flex', justifyContent: 'space-between', fontSize: '14px', fontWeight: 'bold' }}>
+              <span>1 Property</span> <span style={{ color: '#2563eb' }}>400 Phills</span>
+            </div>
+            <div className="price-value-container" style={{ width: '100%', display: 'flex', justifyContent: 'space-between', fontSize: '14px', fontWeight: 'bold' }}>
+              <span>10 Properties</span> <span style={{ color: '#2563eb' }}>5 BHD</span>
+            </div>
+            <div className="price-value-container" style={{ width: '100%', display: 'flex', justifyContent: 'space-between', fontSize: '14px', fontWeight: 'bold' }}>
+              <span>50 Properties</span> <span style={{ color: '#2563eb' }}>20 BHD</span>
+            </div>
+          </div>
+
+          <div className="qr-code-box" style={{ textAlign: 'center', marginTop: '20px', marginBottom: '20px' }}>
+            <img src={QRcodeImg} alt="Payment QR Code" style={{ width: '120px', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '4px' }} />
+            <p style={{ fontSize: '12px', color: '#64748b', marginTop: '6px', fontWeight: 'bold' }}>SCAN TO PAY</p>
+          </div>
+
+          <p className="payment-description" style={{ fontSize: '13px' }}>
+            After payment, send your payment screenshot on WhatsApp to get verified by the admin.
+          </p>
+
+          <div className="modal-actions-row" style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+            <button 
+              className="whatsapp-submit-btn" 
+              onClick={handleWhatsAppShare}
+              style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'center', 
+                gap: '8px', 
+                backgroundColor: '#25D366', 
+                color: 'white', 
+                padding: '12px 15px', 
+                borderRadius: '6px', 
+                border: 'none', 
+                cursor: 'pointer',
+                fontWeight: 'bold',
+                width: '100%',
+                fontSize: '16px',
+                boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+              }}
+            >
+              <MessageSquare size={20} /> Send Screenshot on WhatsApp
+            </button>
+
+            <div className="secondary-actions-group" style={{ display: 'flex', justifyContent: 'flex-end', width: '100%', gap: '10px' }}>
+              <button 
+                className="free-trial-activation-btn" 
+                onClick={closeIntroModal}
+              >
+                Start Free Trial (10 listings · 15 days)
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 
   // Cleanup generated video URL on unmount or when changed
   useEffect(() => {
@@ -117,6 +219,8 @@ const PostProperty = () => {
     { id: 5, label: "Gallery", icon: ImageIcon },
     { id: 6, label: "Schedule", icon: Calendar },
   ];
+
+  // NOTE: Intro page is rendered in the full if(!isStarted) block below
 
   const handleStart = () => {
     // Fetch the latest user profile to ensure we have up-to-date role, limit, and trial status
@@ -222,57 +326,151 @@ const PostProperty = () => {
     }
   };
 
+  // Helper: detect if a URL/File is a video
+  const isVideoFile = (f) => {
+    if (f instanceof File) return f.type.startsWith('video/');
+    if (typeof f === 'string') {
+      return /\.(mp4|mov|webm|mkv|avi)$/i.test(f) || f.includes('data:video');
+    }
+    return false;
+  };
+
+  const processAndUploadFiles = async (files) => {
+    if (files.length === 0) return;
+    setLoading(true);
+
+    try {
+      const uploadedUrls = [];
+
+      // Count existing videos and images in the gallery
+      const existingVideoCount = form.gallery.filter(isVideoFile).length;
+      let newVideoCount = existingVideoCount;
+      const existingImageCount = form.gallery.filter(f => !isVideoFile(f)).length;
+      let newImageCount = existingImageCount;
+
+      let customLogoUrl = null;
+      let createdLogoUrl = false;
+      if (form.useWatermark !== false) {
+        if (form.customLogo instanceof File) {
+          customLogoUrl = URL.createObjectURL(form.customLogo);
+          createdLogoUrl = true;
+        } else if (form.customLogo) {
+          customLogoUrl = form.customLogo;
+        } else if (currentUser?.logoUrl) {
+          customLogoUrl = currentUser.logoUrl;
+        }
+      }
+
+      for (let file of files) {
+        if (file.type.startsWith('video/')) {
+          if (newVideoCount >= 1) {
+            toast.error(`Only one video is allowed per property. ${file.name} was not uploaded.`);
+            continue;
+          }
+          if (file.size > 2 * 1024 * 1024) {
+            toast.error(`${file.name} exceeds 2MB limit.`);
+            continue;
+          }
+          const isHorizontal = await new Promise((resolve) => {
+            const video = document.createElement('video');
+            video.preload = 'metadata';
+            video.onloadedmetadata = () => {
+              window.URL.revokeObjectURL(video.src);
+              resolve(video.videoWidth >= video.videoHeight);
+            };
+            video.onerror = () => resolve(false);
+            video.src = URL.createObjectURL(file);
+          });
+          if (!isHorizontal) {
+            toast.error(`${file.name} is vertical. Please capture videos horizontally.`);
+            continue;
+          }
+
+          let finalFile = file;
+          if (form.useWatermark !== false) {
+            try {
+              toast.success('Applying watermark to video, this might take a moment...', { id: 'watermark' });
+              finalFile = await applyVideoWatermark(file, customLogoUrl);
+              toast.success('Video watermarked successfully!', { id: 'watermark' });
+            } catch (err) {
+              console.error("Video watermark failed", err);
+              toast.error('Failed to apply watermark to video.', { id: 'watermark' });
+            }
+          }
+          const url = await uploadMedia(finalFile);
+          uploadedUrls.push(url);
+          newVideoCount += 1;
+        } else if (file.type.startsWith('image/')) {
+          if (newImageCount >= 6) {
+            toast.error(`Only 6 photos are allowed per property. ${file.name} was not uploaded.`);
+            continue;
+          }
+          const isHorizontal = await new Promise((resolve) => {
+            const img = new Image();
+            img.onload = () => {
+              window.URL.revokeObjectURL(img.src);
+              resolve(img.width >= img.height);
+            };
+            img.onerror = () => resolve(false);
+            img.src = URL.createObjectURL(file);
+          });
+          if (!isHorizontal) {
+            toast.error(`${file.name} is vertical. Please capture photos horizontally.`);
+            continue;
+          }
+          
+          const compressed = await compressImage(file);
+          let finalFile = compressed;
+          if (form.useWatermark !== false) {
+            try {
+              finalFile = await applyImageWatermark(compressed, customLogoUrl);
+            } catch (err) {
+              console.error("Image watermark failed", err);
+            }
+          }
+          const url = await uploadMedia(finalFile);
+          uploadedUrls.push(url);
+          newImageCount += 1;
+        }
+      }
+
+      if (createdLogoUrl) {
+        URL.revokeObjectURL(customLogoUrl);
+      }
+
+      if (uploadedUrls.length > 0) {
+        setForm((prev) => ({
+          ...prev,
+          gallery: [...prev.gallery, ...uploadedUrls],
+        }));
+      }
+    } catch (err) {
+      console.error("File upload error", err);
+      toast.error("Failed to process files.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleFileUpload = async (e) => {
     const files = Array.from(e.target.files);
-    const uploadedUrls = [];
-
-    for (let file of files) {
-      if (file.type.startsWith('video/')) {
-        if (file.size > 2 * 1024 * 1024) {
-          toast.error(`${file.name} exceeds 2MB limit.`);
-          continue;
-        }
-        const isHorizontal = await new Promise((resolve) => {
-          const video = document.createElement('video');
-          video.preload = 'metadata';
-          video.onloadedmetadata = () => {
-            window.URL.revokeObjectURL(video.src);
-            resolve(video.videoWidth >= video.videoHeight);
-          };
-          video.onerror = () => resolve(false);
-          video.src = URL.createObjectURL(file);
-        });
-        if (!isHorizontal) {
-          toast.error(`${file.name} is vertical. Please capture videos horizontally.`);
-          continue;
-        }
-        const url = await uploadMedia(file);
-        uploadedUrls.push(url);
-      } else if (file.type.startsWith('image/')) {
-        const isHorizontal = await new Promise((resolve) => {
-          const img = new Image();
-          img.onload = () => {
-            window.URL.revokeObjectURL(img.src);
-            resolve(img.width >= img.height);
-          };
-          img.onerror = () => resolve(false);
-          img.src = URL.createObjectURL(file);
-        });
-        if (!isHorizontal) {
-          toast.error(`${file.name} is vertical. Please capture photos horizontally.`);
-          continue;
-        }
-        const compressed = await compressImage(file);
-        const url = await uploadMedia(compressed);
-        uploadedUrls.push(url);
-      }
-    }
-
-    if (uploadedUrls.length > 0) {
-      setForm((prev) => ({ ...prev, gallery: [...prev.gallery, ...uploadedUrls] }));
-    }
     e.target.value = '';
+    await processAndUploadFiles(files);
   };
+
+  const handleDrop = async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const files = Array.from(e.dataTransfer.files);
+    await processAndUploadFiles(files);
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+
 
   const handleNext = () => {
     // Step 1 Validation
@@ -471,8 +669,11 @@ Here is the transfer receipt screenshot. Please verify it, increase my listing l
     try {
       setLoading(true);
 
-      // Ensure at least one video is uploaded
-      const hasVideo = form.gallery.some(f => (typeof f !== 'string' && f instanceof File && f.type.startsWith('video/')));
+      // Ensure at least one video is uploaded (check if any file is video or any URL is a video URL)
+      const hasVideo = form.gallery.some(f => 
+        (typeof f === 'string' && f.match(/\.(mp4|mov|webm|mkv|avi)$/i)) || 
+        (f instanceof File && f.type.startsWith('video/'))
+      );
       if (!hasVideo) {
         toast.error('Please upload a video for the property.');
         setLoading(false);
@@ -496,7 +697,7 @@ Here is the transfer receipt screenshot. Please verify it, increase my listing l
       if (form.image instanceof File) {
         const isImage = form.image.type.startsWith('image/');
         if (isImage) {
-          const watermarked = form.useWatermark !== false ? await applyImageWatermark(form.image, customLogoUrl) : form.image;
+          const watermarked = (form.useWatermark !== false && !form._frontImageWatermarked) ? await applyImageWatermark(form.image, customLogoUrl) : form.image;
           mainImageBase64 = await new Promise((resolve) => {
             const reader = new FileReader();
             reader.readAsDataURL(watermarked);
@@ -513,7 +714,7 @@ Here is the transfer receipt screenshot. Please verify it, increase my listing l
 
       const galleryBase64 = await Promise.all(
         form.gallery.map(async file => {
-          if (typeof file === 'string' && file.startsWith('data:')) {
+          if (typeof file === 'string') {
             return file;
           }
           if (file instanceof File && file.type.startsWith('image/')) {
@@ -585,92 +786,76 @@ Here is the transfer receipt screenshot. Please verify it, increase my listing l
 
   if (!isStarted) {
     return (
-      <div className="postIntroPage">
-        <div className="postIntroContent">
-          <div className="introLeft">
-            <h2>Why Post through us?</h2>
-            <div className="trialBanner" style={{ background: 'linear-gradient(90deg, #ff7e5f, #feb47b)', color: '#fff', padding: '15px', borderRadius: '8px', marginBottom: '12px' }}>
-              <p style={{ fontWeight: '600', margin: '0 0 10px 0', fontSize: '15px' }}>
-                10 listings are free for 15 days; after that these properties will be hidden and you have to pay for each property.
-              </p>
-              <div style={{ background: 'rgba(0,0,0,0.1)', padding: '10px', borderRadius: '6px', fontSize: '14px' }}>
-                <strong style={{ display: 'block', marginBottom: '5px' }}>Pricing Details:</strong>
-                <ul style={{ margin: 0, paddingLeft: '20px', lineHeight: '1.6' }}>
-                  <li><strong>1 Property:</strong> 400 Phills</li>
-                  <li><strong>10 Properties:</strong> 5 BHD</li>
-                  <li><strong>50 Properties:</strong> 20 BHD</li>
-                </ul>
-                <p style={{ marginTop: '8px' }}>After payment, you will be able to post the property and it will be visible.</p>
-              </div>
-            </div>
-            <div className="featureList">
-              <div className="featureItem">
-                <div className="featureIcon"><Users size={20} /></div>
-                <div>
-                  <h4>Faster Tenants</h4>
-                  <p>Connect with genuine seekers</p>
+      <>
+        {showIntroModal && <IntroModal />}
+        <div className="postIntroPage" style={{ position: 'relative' }}>
+
+          <div className="postIntroContent">
+            <div className="introLeft">
+              <h2>Why Post through us?</h2>
+              <div className="trialBanner" style={{ background: 'linear-gradient(90deg, #ff7e5f, #feb47b)', color: '#fff', padding: '15px', borderRadius: '8px', marginBottom: '12px' }}>
+                <p style={{ fontWeight: '600', margin: '0 0 10px 0', fontSize: '15px' }}>
+                  10 listings are free for 15 days; after that these properties will be hidden and you have to pay for each property.
+                </p>
+                <div style={{ background: 'rgba(0,0,0,0.1)', padding: '10px', borderRadius: '6px', fontSize: '14px' }}>
+                  <strong style={{ display: 'block', marginBottom: '5px' }}>Pricing Details:</strong>
+                  <ul style={{ margin: 0, paddingLeft: '20px', lineHeight: '1.6' }}>
+                    <li><strong>1 Property:</strong> 400 Phills</li>
+                    <li><strong>10 Properties:</strong> 5 BHD</li>
+                    <li><strong>50 Properties:</strong> 20 BHD</li>
+                  </ul>
+                  <p style={{ marginTop: '8px' }}>After payment, you will be able to post the property and it will be visible.</p>
                 </div>
               </div>
-              <div className="featureItem">
-                <div className="featureIcon"><BriefcaseBusiness size={20} /></div>
-                <div>
-                  <h4>10 lac tenants/buyers connections</h4>
-                  <p>Wide reach across GCC & South Asia</p>
+              <div className="featureList">
+                <div className="featureItem">
+                  <div className="featureIcon"><Users size={20} /></div>
+                  <div>
+                    <h4>Faster Tenants</h4>
+                    <p>Connect with genuine seekers</p>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
 
-          <div className="introRight">
-            <div className="startForm">
-              <div className="citySelectRow">
-                <select value={form.country} onChange={e => {
-                  const country = e.target.value;
-                  const currency = countryCurrencyMap[country] || "₹";
-                  setForm({ ...form, country, currency, city: "" });
-                }}>
-                  <option value="">Select Country</option>
-                  {Object.keys(countryCityMap).map(c => (
-                    <option key={c} value={c}>{c}</option>
-                  ))}
-                </select>
-                <select value={form.city} onChange={e => setForm({ ...form, city: e.target.value })} disabled={!form.country}>
-                  <option value="">Select City</option>
-                  {(countryCityMap[form.country] || []).map(c => (
-                    <option key={c} value={c}>{c}</option>
-                  ))}
-                </select>
-              </div>
-
-
-
-
-              <div className="adTypeSection">
-                <p>Select Property Ad Type</p>
-                <div className="adTypes">
-                  {["Buy", "Sale", "Rental", "Commercial", "Openland", "Ongoing & Upcoming Projects with EMI"].map(a => (
-                    <button
-                      key={a}
-                      className={form.adType === a ? "active" : ""}
-                      onClick={() => setForm({ ...form, adType: a })}
-                    >
-                      {a}
-                    </button>
-                  ))}
+            <div className="introRight">
+              <div className="startForm">
+                <div className="citySelectRow">
+                  <select value={form.country} onChange={e => {
+                    const country = e.target.value;
+                    const currency = countryCurrencyMap[country] || '₹';
+                    setForm({ ...form, country, currency, city: '' });
+                  }}>
+                    <option value="">Select Country</option>
+                    {Object.keys(countryCityMap).map(c => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
+                  </select>
+                  <select value={form.city} onChange={e => setForm({ ...form, city: e.target.value })} disabled={!form.country}>
+                    <option value="">Select City</option>
+                    {(countryCityMap[form.country] || []).map(c => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
+                  </select>
                 </div>
+                <div className="adTypeSection">
+                  <p>Select Property Ad Type</p>
+                  <div className="adTypes">
+                    {['Buy', 'Sale', 'Rental', 'Commercial', 'Openland', 'Ongoing & Upcoming Projects with EMI'].map(a => (
+                      <button key={a} className={form.adType === a ? 'active' : ''} onClick={() => setForm({ ...form, adType: a })}>
+                        {a}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <button className="startPostingBtn" onClick={handleStart} disabled={!form.city || !form.country}>
+                  Start Posting Your Ad For FREE
+                </button>
               </div>
-
-              <button
-                className="startPostingBtn"
-                onClick={handleStart}
-                disabled={!form.city || !form.country}
-              >
-                Start Posting Your Ad For FREE
-              </button>
             </div>
           </div>
         </div>
-      </div>
+      </>
     );
   }
 
@@ -1213,9 +1398,35 @@ Here is the transfer receipt screenshot. Please verify it, increase my listing l
                           type="file"
                           hidden
                           accept="image/*"
-                          onChange={(e) => {
+                          onChange={async (e) => {
                             if (e.target.files?.[0]) {
-                              setForm({ ...form, image: e.target.files[0] });
+                              const file = e.target.files[0];
+                              let customLogoUrl = null;
+                              let createdLogoUrl = false;
+                              if (form.useWatermark !== false) {
+                                if (form.customLogo instanceof File) {
+                                  customLogoUrl = URL.createObjectURL(form.customLogo);
+                                  createdLogoUrl = true;
+                                } else if (form.customLogo) {
+                                  customLogoUrl = form.customLogo;
+                                } else if (currentUser?.logoUrl) {
+                                  customLogoUrl = currentUser.logoUrl;
+                                }
+                              }
+                              
+                              let finalFile = file;
+                              if (form.useWatermark !== false) {
+                                try {
+                                  finalFile = await applyImageWatermark(file, customLogoUrl);
+                                } catch (err) {
+                                  console.error("Image watermark failed", err);
+                                }
+                              }
+                              
+                              if (createdLogoUrl) {
+                                URL.revokeObjectURL(customLogoUrl);
+                              }
+                              setForm({ ...form, image: finalFile, _frontImageWatermarked: true });
                             }
                           }}
                         />
@@ -1224,114 +1435,125 @@ Here is the transfer receipt screenshot. Please verify it, increase my listing l
                   </div> {/* close frontImageUpload */}
                 </div> {/* end of frontImageSection */}
 
-
-                <div className="photosSectionBlock">
-                  <div className="photosSectionHeader">
-                    <ImageIcon size={22} color="#3b82f6" />
-                    <div>
-                      <h3 style={{ margin: 0 }}>Add photos to get 5X more responses.</h3>
-                      <p style={{ margin: '4px 0 0', color: '#64748b', fontSize: '13px' }}>90% tenants contact on properties with photos.</p>
-                      <p style={{ margin: '6px 0 0', color: '#1e293b', fontSize: '13px', fontWeight: 500 }}>We can upload photos on your behalf</p>
-                      <small style={{ display: 'block', color: '#ff9800', marginTop: '4px', fontSize: '11px' }}>* Please capture photos & videos horizontally (landscape) using 0.5x zoom to keep sizes in KBs. Max video size is 2MB.</small>
+                {/* Combined Drag-and-Drop Upload Zone for Photos & Videos */}
+                <div
+                  className="dragDropZone"
+                  onDragOver={handleDragOver}
+                  onDrop={handleDrop}
+                  style={{
+                    border: '2px dashed #3b82f6',
+                    borderRadius: '14px',
+                    padding: '24px',
+                    background: 'linear-gradient(135deg, #eff6ff 0%, #f8faff 100%)',
+                    marginBottom: '20px',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  <div style={{ textAlign: 'center', marginBottom: '18px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'center', gap: '12px', marginBottom: '10px' }}>
+                      <ImageIcon size={28} color="#3b82f6" />
+                      <Video size={28} color="#8b5cf6" />
                     </div>
+                    <p style={{ margin: 0, fontWeight: 700, fontSize: '15px', color: '#1e40af' }}>Drag &amp; Drop Photos or Videos Here</p>
+                    <p style={{ margin: '4px 0 0', color: '#64748b', fontSize: '13px' }}>or click the buttons below to browse</p>
+                    <small style={{ display: 'block', color: '#ff9800', marginTop: '6px', fontSize: '11px' }}>* Capture horizontally (landscape) · Max video size: 2MB · One video per property</small>
                   </div>
-                  <div className="photoSlotsGrid">
-                    {[0, 1, 2, 3, 4, 5].map((slotIdx) => {
-                      const imageFiles = form.gallery.filter(f => (
-        // Any string is assumed to be an image URL
-        typeof f === 'string' ||
-        // File objects that are images
-        (f instanceof File && f.type.startsWith('image/'))
-      ));
-                      const file = imageFiles[slotIdx];
-                      return (
-                        <div key={slotIdx} className={`photoSlot ${file ? 'filled' : 'empty'}`}
-                          onClick={() => {
-                            if (!file) document.getElementById('photoInput').click();
-                          }}
-                        >
-                          {file ? (
-                            <>
-                              {file instanceof File ? (
-                                <img src={URL.createObjectURL(file)} alt={`Photo ${slotIdx + 1}`} className="slotImg" />
-                              ) : (
-                                <img src={file} alt={`Photo ${slotIdx + 1}`} className="slotImg" />
-                              )}
+
+                  {/* Add buttons row */}
+                  <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', marginBottom: '20px' }}>
+                    <button
+                      type="button"
+                      className="addPhotosBtn"
+                      style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+                      onClick={() => document.getElementById('photoInput').click()}
+                    >
+                      <ImageIcon size={16} /> Add Photos
+                    </button>
+                    <button
+                      type="button"
+                      className="addPhotosBtn"
+                      style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'linear-gradient(135deg, #7c3aed, #a855f7)' }}
+                      onClick={() => document.getElementById('videoInput').click()}
+                    >
+                      <Video size={16} /> Add Video
+                    </button>
+                  </div>
+
+                  <input id="photoInput" type="file" multiple hidden accept="image/*" onChange={handleFileUpload} />
+                  <input id="videoInput" type="file" multiple hidden accept="video/*" onChange={handleFileUpload} />
+
+                  {/* Photo slots grid (Fixed 6 slots) */}
+                  <div style={{ marginBottom: '16px' }}>
+                    <p style={{ margin: '0 0 10px', fontWeight: 600, fontSize: '13px', color: '#334155' }}>
+                      📸 Photos ({form.gallery.filter(f => !isVideoFile(f)).length}/6)
+                    </p>
+                    <div className="photoSlotsGrid">
+                      {Array.from({ length: 6 }).map((_, slotIdx) => {
+                        const photos = form.gallery.filter(f => !isVideoFile(f));
+                        const file = photos[slotIdx];
+                        if (file) {
+                          return (
+                            <div key={slotIdx} className="photoSlot filled">
+                              <img
+                                src={file instanceof File ? URL.createObjectURL(file) : file}
+                                alt={`Photo ${slotIdx + 1}`}
+                                className="slotImg"
+                              />
                               <span className="slotNumber">{slotIdx + 1}</span>
-                              <button className="slotRemoveBtn" onClick={(e) => {
+                              <button type="button" className="slotRemoveBtn" onClick={(e) => {
                                 e.stopPropagation();
                                 const galleryIdx = form.gallery.indexOf(file);
-                                setForm({ ...form, gallery: form.gallery.filter((_, idx) => idx !== galleryIdx) });
+                                setForm(prev => ({ ...prev, gallery: prev.gallery.filter((_, idx) => idx !== galleryIdx) }));
                               }}><X size={14} /></button>
-                            </>
-                          ) : (
-                            <>
-                              <div className="slotPlaceholder">
-                                <Plus size={24} color="#94a3b8" />
-                              </div>
-                              <span className="slotNumber">{slotIdx + 1}</span>
-                            </>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                  <input
-                    id="photoInput"
-                    type="file"
-                    multiple
-                    hidden
-                    accept="image/*"
-                    onChange={handleFileUpload}
-                  />
-                </div>
-
-                {/* Video Section */}
-                <div className="videoSectionBlock">
-                  <div className="videoSectionHeader" style={{ cursor: 'pointer' }} onClick={() => document.getElementById('videoInput').click()}>
-                    <Video size={22} color="#8b5cf6" />
-                    <div>
-                      <h3 style={{ margin: 0 }}>Upload Video</h3>
-                      <p style={{ margin: '4px 0 0', color: '#64748b', fontSize: '13px' }}>Give seekers a virtual tour of your property.</p>
-                    </div>
-                    <button className="addPhotosBtn" style={{ marginLeft: 'auto' }}>Add Video</button>
-                  </div>
-                  <input
-                    id="videoInput"
-                    type="file"
-                    multiple
-                    hidden
-                    accept="video/*"
-                    onChange={handleFileUpload}
-                  />
-                  {form.gallery.filter(f => (
-                      (typeof f === 'string' && f) ||
-                      (f instanceof File && f.type.startsWith('video/'))
-                    )).length > 0 && (
-                    <div className="videoPreviewList">
-                      {form.gallery.filter(f => (
-                        (typeof f === 'string' && f) ||
-                        (f instanceof File && f.type.startsWith('video/'))
-                      )).map((vf, vi) => {
-                        const galleryIdx = form.gallery.indexOf(vf);
-                        const src = typeof vf === 'string' ? vf : URL.createObjectURL(vf);
-                        return (
-                          <div key={vi} className="videoPreviewCard">
-                            <video src={src} className="videoThumb" controls />
-                            <div className="videoPreviewInfo">
-                              <span className="fileName">{vf.name || 'Video'}</span>
-                              <span className="fileSize">{typeof vf !== 'string' ? (vf.size / 1024).toFixed(1) : ''} KB</span>
                             </div>
-                            <button className="slotRemoveBtn" onClick={() => setForm({ ...form, gallery: form.gallery.filter((_, idx) => idx !== galleryIdx) })}>
-                              <X size={14} />
-                            </button>
-                          </div>
-                        );
+                          );
+                        } else {
+                          return (
+                            <div
+                              key={slotIdx}
+                              className="photoSlot empty"
+                              onClick={() => document.getElementById('photoInput').click()}
+                              style={{ cursor: 'pointer' }}
+                            >
+                              <div className="slotPlaceholder"><Plus size={24} color="#94a3b8" /></div>
+                            </div>
+                          );
+                        }
                       })}
                     </div>
-                  )}
-                </div>
+                  </div>
 
+                  {/* Video preview area */}
+                  {form.gallery.filter(isVideoFile).length > 0 && (
+                    <div>
+                      <p style={{ margin: '0 0 10px', fontWeight: 600, fontSize: '13px', color: '#334155' }}>
+                        🎬 Videos ({form.gallery.filter(isVideoFile).length})
+                      </p>
+                      <div className="videoPreviewList">
+                        {form.gallery.filter(isVideoFile).map((vf, vi) => {
+                          const galleryIdx = form.gallery.indexOf(vf);
+                          const src = typeof vf === 'string' ? vf : URL.createObjectURL(vf);
+                          return (
+                            <div key={vi} className="videoPreviewCard">
+                              <video src={src} className="videoThumb" controls />
+                              <div className="videoPreviewInfo">
+                                <span className="fileName">{vf instanceof File ? vf.name : 'Uploaded Video'}</span>
+                                <span className="fileSize">{vf instanceof File ? (vf.size / 1024).toFixed(1) + ' KB' : '✓ Saved'}</span>
+                              </div>
+                              <button className="slotRemoveBtn" onClick={() =>
+                                setForm(prev => ({ ...prev, gallery: prev.gallery.filter((_, idx) => idx !== galleryIdx) }))
+                              }>
+                                <X size={14} />
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Empty state message removed since slots are always visible */}
+                </div> {/* end dragDropZone */}
 
               </div>
             )}

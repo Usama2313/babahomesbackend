@@ -157,57 +157,147 @@ const EditProperty = () => {
     });
   };
 
+  const uploadMedia = async (file) => {
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const res = await API.post('/properties/upload-media', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      return res.data.url;
+    } catch (err) {
+      console.error("Upload failed", err);
+      toast.error('Failed to upload media.');
+      throw err;
+    }
+  };
+
   const handleFileUpload = async (e) => {
     const files = Array.from(e.target.files);
-    const validFiles = [];
+    if (files.length === 0) return;
+    setLoading(true);
 
-    for (let file of files) {
-      if (file.type.startsWith('video/')) {
-        if (file.size > 2 * 1024 * 1024) {
-          toast.error(`${file.name} exceeds 2MB limit.`);
-          continue;
+    try {
+      const uploadedUrls = [];
+      const currentUser = JSON.parse(localStorage.getItem("babaUser") || "{}");
+
+      // Count existing videos and images in the gallery
+      const existingVideoCount = form.gallery.filter(f =>
+        (typeof f === 'string' && f.match(/\.(mp4|mov|webm|mkv|avi)$/i)) ||
+        (f instanceof File && f.type.startsWith('video/'))
+      ).length;
+      let newVideoCount = existingVideoCount;
+
+      const existingImageCount = form.gallery.filter(f =>
+        (typeof f === 'string' && !f.match(/\.(mp4|mov|webm|mkv|avi)$/i)) ||
+        (f instanceof File && f.type.startsWith('image/'))
+      ).length;
+      let newImageCount = existingImageCount;
+
+      let customLogoUrl = null;
+      let createdLogoUrl = false;
+      if (form.useWatermark !== false) {
+        if (form.customLogo instanceof File) {
+          customLogoUrl = URL.createObjectURL(form.customLogo);
+          createdLogoUrl = true;
+        } else if (form.customLogo) {
+          customLogoUrl = form.customLogo;
+        } else if (currentUser?.logoUrl) {
+          customLogoUrl = currentUser.logoUrl;
         }
-
-        const isHorizontal = await new Promise((resolve) => {
-          const video = document.createElement('video');
-          video.preload = 'metadata';
-          video.onloadedmetadata = () => {
-            window.URL.revokeObjectURL(video.src);
-            resolve(video.videoWidth >= video.videoHeight);
-          };
-          video.onerror = () => resolve(false);
-          video.src = URL.createObjectURL(file);
-        });
-
-        if (!isHorizontal) {
-          toast.error(`${file.name} is vertical. Please capture videos horizontally.`);
-          continue;
-        }
-        validFiles.push(file);
-      } else if (file.type.startsWith('image/')) {
-        const isHorizontal = await new Promise((resolve) => {
-          const img = new Image();
-          img.onload = () => {
-            window.URL.revokeObjectURL(img.src);
-            resolve(img.width >= img.height);
-          };
-          img.onerror = () => resolve(false);
-          img.src = URL.createObjectURL(file);
-        });
-
-        if (!isHorizontal) {
-          toast.error(`${file.name} is vertical. Please capture photos horizontally.`);
-          continue;
-        }
-        const compressed = await compressImage(file);
-        validFiles.push(compressed);
       }
-    }
 
-    if (validFiles.length > 0) {
-      setForm(prev => ({ ...prev, gallery: [...prev.gallery, ...validFiles] }));
+      for (let file of files) {
+        if (file.type.startsWith('video/')) {
+          if (newVideoCount >= 1) {
+            toast.error(`Only one video is allowed per property. ${file.name} was not uploaded.`);
+            continue;
+          }
+          if (file.size > 2 * 1024 * 1024) {
+            toast.error(`${file.name} exceeds 2MB limit.`);
+            continue;
+          }
+
+          const isHorizontal = await new Promise((resolve) => {
+            const video = document.createElement('video');
+            video.preload = 'metadata';
+            video.onloadedmetadata = () => {
+              window.URL.revokeObjectURL(video.src);
+              resolve(video.videoWidth >= video.videoHeight);
+            };
+            video.onerror = () => resolve(false);
+            video.src = URL.createObjectURL(file);
+          });
+
+          if (!isHorizontal) {
+            toast.error(`${file.name} is vertical. Please capture videos horizontally.`);
+            continue;
+          }
+          
+          let finalFile = file;
+          if (form.useWatermark !== false) {
+            try {
+              toast.success('Applying watermark to video, this might take a moment...', { id: 'watermark' });
+              finalFile = await applyVideoWatermark(file, customLogoUrl);
+              toast.success('Video watermarked successfully!', { id: 'watermark' });
+            } catch (err) {
+              console.error("Video watermark failed", err);
+              toast.error('Failed to apply watermark to video.', { id: 'watermark' });
+            }
+          }
+          
+          const url = await uploadMedia(finalFile);
+          uploadedUrls.push(url);
+          newVideoCount += 1;
+        } else if (file.type.startsWith('image/')) {
+          if (newImageCount >= 6) {
+            toast.error(`Only 6 photos are allowed per property. ${file.name} was not uploaded.`);
+            continue;
+          }
+          const isHorizontal = await new Promise((resolve) => {
+            const img = new Image();
+            img.onload = () => {
+              window.URL.revokeObjectURL(img.src);
+              resolve(img.width >= img.height);
+            };
+            img.onerror = () => resolve(false);
+            img.src = URL.createObjectURL(file);
+          });
+
+          if (!isHorizontal) {
+            toast.error(`${file.name} is vertical. Please capture photos horizontally.`);
+            continue;
+          }
+          const compressed = await compressImage(file);
+          
+          let finalFile = compressed;
+          if (form.useWatermark !== false) {
+            try {
+              finalFile = await applyImageWatermark(compressed, customLogoUrl);
+            } catch (err) {
+              console.error("Image watermark failed", err);
+            }
+          }
+          const url = await uploadMedia(finalFile);
+          uploadedUrls.push(url);
+          newImageCount += 1;
+        }
+      }
+
+      if (createdLogoUrl) {
+        URL.revokeObjectURL(customLogoUrl);
+      }
+
+      if (uploadedUrls.length > 0) {
+        setForm(prev => ({ ...prev, gallery: [...prev.gallery, ...uploadedUrls] }));
+      }
+    } catch (err) {
+      console.error("File upload error", err);
+      toast.error("Failed to process files.");
+    } finally {
+      setLoading(false);
+      e.target.value = '';
     }
-    e.target.value = '';
   };
 
   const handleNext = () => {
@@ -313,7 +403,7 @@ const EditProperty = () => {
       let mainImageBase64 = form.image;
       if (form.image instanceof File) {
         if (form.image.type.startsWith('image/')) {
-          const watermarked = await applyImageWatermark(form.image, customLogoUrl);
+          const watermarked = (form.useWatermark !== false && !form._frontImageWatermarked) ? await applyImageWatermark(form.image, customLogoUrl) : form.image;
           mainImageBase64 = await new Promise((resolve) => {
             const reader = new FileReader();
             reader.readAsDataURL(watermarked);
@@ -947,9 +1037,35 @@ const EditProperty = () => {
                           type="file"
                           hidden
                           accept="image/*"
-                          onChange={(e) => {
+                          onChange={async (e) => {
                             if (e.target.files?.[0]) {
-                              setForm({ ...form, image: e.target.files[0] });
+                              const file = e.target.files[0];
+                              let customLogoUrl = null;
+                              let createdLogoUrl = false;
+                              if (form.useWatermark !== false) {
+                                if (form.customLogo instanceof File) {
+                                  customLogoUrl = URL.createObjectURL(form.customLogo);
+                                  createdLogoUrl = true;
+                                } else if (form.customLogo) {
+                                  customLogoUrl = form.customLogo;
+                                } else if (currentUser?.logoUrl) {
+                                  customLogoUrl = currentUser.logoUrl;
+                                }
+                              }
+                              
+                              let finalFile = file;
+                              if (form.useWatermark !== false) {
+                                try {
+                                  finalFile = await applyImageWatermark(file, customLogoUrl);
+                                } catch (err) {
+                                  console.error("Image watermark failed", err);
+                                }
+                              }
+                              
+                              if (createdLogoUrl) {
+                                URL.revokeObjectURL(customLogoUrl);
+                              }
+                              setForm({ ...form, image: finalFile, _frontImageWatermarked: true });
                             }
                           }}
                         />

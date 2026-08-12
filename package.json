@@ -1,6 +1,16 @@
 {
+  "name": "babahoms-root",
+  "version": "1.0.0",
+  "scripts": {
+    "dev:backend": "npm --prefix backend run dev",
+    "dev:frontend": "npm --prefix frontend run dev",
+    "dev": "concurrently \"npm --prefix backend run dev\" \"npm --prefix frontend run dev\""
+  },
   "dependencies": {
     "axios": "^1.17.0",
     "form-data": "^4.0.5"
+  },
+  "devDependencies": {
+    "concurrently": "^10.0.4"
   }
 }

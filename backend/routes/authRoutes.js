@@ -421,7 +421,7 @@ router.post("/forgot-password", async (req, res) => {
         const smtpConfig = {
             host: process.env.SMTP_HOST || "smtp.gmail.com",
             port: parseInt(process.env.SMTP_PORT || 587),
-            secure: false,
+            secure: process.env.SMTP_SECURE === "true" || process.env.SMTP_PORT === "465",
             auth: {
                 user: process.env.SMTP_USER,
                 pass: process.env.SMTP_PASS
@@ -430,14 +430,6 @@ router.post("/forgot-password", async (req, res) => {
                 rejectUnauthorized: false
             }
         };
-
-        // Use service: 'gmail' if host is gmail for better compatibility
-        if (smtpConfig.host.includes("gmail")) {
-            delete smtpConfig.host;
-            delete smtpConfig.port;
-            delete smtpConfig.secure;
-            smtpConfig.service = 'gmail';
-        }
 
         const transporter = nodemailer.createTransport(smtpConfig);
 
